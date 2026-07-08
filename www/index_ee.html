@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>WebServ 42</title>
+	<style>
+		body {
+			font-family: Arial, sans-serif;
+			text-align: center;
+			margin-top: 50px;
+			background-color: #f4f4f9;
+		}
+
+		h1 {
+			color: #333;
+		}
+
+		p {
+			color: #666;
+		}
+
+		.container {
+			background: white;
+			padding: 30px;
+			border-radius: 10px;
+			box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+			display: inline-block;
+			max-width: 600px;
+			width: 100%;
+		}
+
+		.nav-menu {
+			margin-top: 25px;
+			padding: 15px;
+			background-color: #fff;
+			border: 1px solid #e1e1e8;
+			border-radius: 5px;
+			text-align: left;
+		}
+
+		.nav-menu h3 {
+			margin-top: 0;
+			color: #444;
+			font-size: 16px;
+			border-bottom: 2px solid #eaeaea;
+			padding-bottom: 8px;
+		}
+
+		.nav-links {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+		}
+
+		.nav-links li {
+			margin: 10px 0;
+		}
+
+		.nav-links a {
+			color: #2a6bc4;
+			text-decoration: none;
+			font-weight: 500;
+			display: inline-block;
+		}
+
+		.nav-links a:hover {
+			color: #1a498b;
+			text-decoration: underline;
+		}
+
+		.nav-links .danger-link {
+			color: #c4522a;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>Welcome to WebServ</h1>
+		<p>Your minimalist HTTP server is running successfully!</p>
+
+		<div class="nav-menu">
+			<h3>📚 Documentação e Guias Estáticos</h3>
+			<ul class="nav-links">
+				<li><a href="geral.html">🔍 Visão Geral do Projeto</a></li>
+				<li><a href="regua.html">📋 Régua de Avaliação Completa</a></li>
+				<li><a href="server.html">⚡ Módulo Server (Multiplexing & I/O)</a></li>
+				<li><a href="config.html">🔧 Módulo Config (Parser)</a></li>
+				<li><a href="http.html">🌐 Módulo HTTP (Request/Response)</a></li>
+				<li><a href="404.html" class="danger-link">⚠️ Testar Página de Erro (404.html)</a></li>
+			</ul>
+		</div>
+
+		<div class="nav-menu" style="margin-top: 15px;">
+			<h3>🚀 Testes de Execução CGI</h3>
+			<ul class="nav-links">
+				<li><a href="cgi-bin/hello.py">🐍 CGI - Hello World (Python)</a></li>
+				<li><a href="cgi-bin/session.py">🍪 CGI - Cookies & Sessão</a></li>
+				<li><a href="cgi-bin/infinite_loop.py" class="danger-link">🔄 CGI - Loop Infinito (Teste Timeout)</a></li>
+				<li><a href="cgi-bin/error_script.py" class="danger-link">💥 CGI - Erro de Execução (500)</a></li>
+			</ul>
+		</div>
+
+		<h2 style="margin-top: 30px; color: #555; font-size: 18px;">Development Team</h2>
+		<div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: left;">
+			<p><strong>🔧 bolegari</strong> - <em>Config Module</em> (Configuration Parser)</p>
+			<p><strong>🌐 kgagliar</strong> - <em>HTTP Module</em> (Request/Response Handler)</p>
+			<p><strong>⚡ jose-cad</strong> - <em>Server Module</em> (Multiplexing & I/O)</p>
+		</div>
+	</div>
+</body>
+
+</html>

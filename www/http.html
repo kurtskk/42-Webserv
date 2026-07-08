@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Módulo HTTP — Guia Profundo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg: #fafaf8;
+  --bg2: #f3f2ee;
+  --bg3: #eae9e3;
+  --border: #d8d6ce;
+  --border2: #c8c5bb;
+  --ink: #1a1917;
+  --ink2: #3d3b36;
+  --ink3: #6b6860;
+  --accent: #c4522a;
+  --accent2: #2a6bc4;
+  --accent3: #2a8c4e;
+  --accent4: #7a2ac4;
+  --yellow-bg: #fef9e7;
+  --yellow-border: #e8d88a;
+  --blue-bg: #e8f0fe;
+  --blue-border: #a8c0f0;
+  --green-bg: #e8f5ee;
+  --green-border: #a0d0b0;
+  --red-bg: #fde8e4;
+  --red-border: #f0b0a0;
+  --purple-bg: #f0e8fe;
+  --purple-border: #c8a8f0;
+  --mono: 'Inconsolata', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.7; }
+
+.header { background: var(--ink); color: var(--bg); padding: 2.5rem 2rem; }
+.header-inner { max-width: 820px; margin: 0 auto; }
+.header-tag { font-family: var(--mono); font-size: .7rem; letter-spacing: .15em; color: #888; text-transform: uppercase; margin-bottom: .5rem; }
+.header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.1; margin-bottom: .6rem; }
+.header h1 span { color: var(--accent); }
+.header-desc { font-size: .9rem; color: #aaa; max-width: 520px; }
+.header-files { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
+.hf { font-family: var(--mono); font-size: .72rem; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); border-radius: 3px; padding: .2rem .6rem; color: #ccc; }
+
+.nav { background: var(--bg2); border-bottom: 1px solid var(--border); padding: .6rem 1.5rem; position: sticky; top: 0; z-index: 100; overflow-x: auto; white-space: nowrap; }
+.nav a { font-family: var(--mono); font-size: .7rem; color: var(--ink3); text-decoration: none; margin-right: 1.2rem; letter-spacing: .03em; transition: color .15s; }
+.nav a:hover { color: var(--accent); }
+
+.page { max-width: 820px; margin: 0 auto; padding: 2rem 1.2rem 5rem; }
+
+.section { margin-top: 3rem; }
+.sec-head { display: flex; align-items: baseline; gap: .8rem; margin-bottom: 1.4rem; padding-bottom: .6rem; border-bottom: 2px solid var(--ink); }
+.sec-num { font-family: var(--mono); font-size: .65rem; font-weight: 700; background: var(--ink); color: var(--bg); padding: .18rem .45rem; border-radius: 2px; letter-spacing: .06em; }
+.sec-title { font-size: 1.15rem; font-weight: 700; color: var(--ink); }
+.sec-file { font-family: var(--mono); font-size: .72rem; color: var(--accent2); margin-left: auto; white-space: nowrap; }
+
+.func { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 1.2rem; overflow: hidden; }
+.func-sig { background: var(--ink); padding: .7rem 1rem; font-family: var(--mono); font-size: .8rem; color: #e0d8c8; letter-spacing: .01em; line-height: 1.5; }
+.func-sig .ret { color: #f4a261; }
+.func-sig .name { color: #90e0a8; font-weight: 600; }
+.func-sig .param { color: #a8c8f8; }
+.func-sig .kw { color: #c084fc; }
+
+.func-body { padding: .9rem 1rem; background: var(--bg); }
+.func-section { margin-bottom: .9rem; }
+.func-section:last-child { margin-bottom: 0; }
+.func-label { font-family: var(--mono); font-size: .62rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink3); margin-bottom: .35rem; display: flex; align-items: center; gap: .4rem; }
+.func-label::before { content: ''; display: block; width: 16px; height: 1px; background: var(--border2); }
+.func-text { font-size: .88rem; color: var(--ink2); line-height: 1.72; }
+
+.code-block { background: #1a1917; border-radius: 5px; margin: .6rem 0; overflow: hidden; }
+.code-file { background: #252420; padding: .3rem .8rem; font-family: var(--mono); font-size: .62rem; color: #888; border-bottom: 1px solid #333; }
+pre { padding: .75rem 1rem; font-family: var(--mono); font-size: .78rem; color: #d0cfc8; line-height: 1.65; overflow-x: auto; white-space: pre; }
+.kw { color: #c084fc; }
+.str { color: #a8c870; }
+.num { color: #f4a261; }
+.cmt { color: #666; font-style: italic; }
+.fn { color: #90e0a8; }
+.type { color: #60c8f8; }
+.var { color: #f8c060; }
+
+.box { border-radius: 5px; padding: .75rem 1rem; margin: .6rem 0; font-size: .86rem; line-height: 1.7; }
+.box-why { background: var(--yellow-bg); border: 1px solid var(--yellow-border); }
+.box-why::before { content: '💡 Por que assim: '; font-weight: 700; color: #b8900a; }
+.box-warn { background: var(--red-bg); border: 1px solid var(--red-border); }
+.box-warn::before { content: '⚠ Atenção: '; font-weight: 700; color: var(--accent); }
+.box-note { background: var(--blue-bg); border: 1px solid var(--blue-border); }
+.box-note::before { content: '📌 Nota: '; font-weight: 700; color: var(--accent2); }
+.box-flow { background: var(--green-bg); border: 1px solid var(--green-border); }
+.box-flow::before { content: '→ Fluxo: '; font-weight: 700; color: var(--accent3); }
+.box-syntax { background: var(--purple-bg); border: 1px solid var(--purple-border); }
+.box-syntax::before { content: '🔬 Sintaxe C++98: '; font-weight: 700; color: var(--accent4); }
+
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; padding: .6rem 0; margin: .4rem 0; }
+.ch { font-family: var(--mono); font-size: .72rem; background: var(--bg2); border: 1px solid var(--border2); border-radius: 3px; padding: .2rem .55rem; color: var(--ink2); }
+.ch.green { background: var(--green-bg); border-color: var(--green-border); color: var(--accent3); }
+.ch.blue { background: var(--blue-bg); border-color: var(--blue-border); color: var(--accent2); }
+.ch.red { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+.ch.yellow { background: var(--yellow-bg); border-color: var(--yellow-border); color: #8a6500; }
+.ch.purple { background: var(--purple-bg); border-color: var(--purple-border); color: var(--accent4); }
+.arr { color: var(--ink3); font-size: .8rem; }
+
+table.detail { width: 100%; border-collapse: collapse; font-size: .82rem; margin: .6rem 0; }
+table.detail th { background: var(--bg3); padding: .45rem .8rem; text-align: left; font-family: var(--mono); font-size: .65rem; color: var(--ink3); border-bottom: 2px solid var(--border2); letter-spacing: .06em; text-transform: uppercase; }
+table.detail td { padding: .45rem .8rem; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--ink2); }
+table.detail tr:last-child td { border-bottom: none; }
+table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color: var(--accent2); font-weight: 600; }
+
+.overview { background: var(--ink); color: #e0d8c8; border-radius: 6px; padding: 1.2rem 1.4rem; margin-bottom: 2rem; }
+.overview h2 { font-size: .95rem; color: #90e0a8; margin-bottom: .6rem; font-family: var(--mono); }
+.overview p { font-size: .88rem; line-height: 1.75; color: #c0b8a8; }
+.overview p + p { margin-top: .5rem; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="header-tag">Módulo 02 · Webserv</div>
+    <h1>Módulo <span>HTTP</span></h1>
+    <p class="header-desc">Guia profundo — HttpRequest, HttpResponse e CgiHandler. Cada função, cada decisão técnica, cada sintaxe C++98, fluxo completo de entrada e saída.</p>
+    <div class="header-files">
+      <span class="hf">HttpRequest.hpp</span>
+      <span class="hf">HttpRequest.cpp</span>
+      <span class="hf">HttpResponse.hpp</span>
+      <span class="hf">HttpResponse.cpp</span>
+      <span class="hf">CgiHandler.hpp</span>
+      <span class="hf">CgiHandler.cpp</span>
+    </div>
+  </div>
+</div>
+
+<nav class="nav">
+  <a href="#s0">Visão Geral</a>
+  <a href="#s1">HttpRequest — construtor</a>
+  <a href="#s2">HttpRequest — chunked</a>
+  <a href="#s3">HttpRequest — parseRequestLine</a>
+  <a href="#s4">HttpRequest — parseHeader & getCookie</a>
+  <a href="#s5">HttpResponse — generateResponse</a>
+  <a href="#s6">HttpResponse — handlers GET/POST/DELETE</a>
+  <a href="#s7">HttpResponse — buildHeader & sessões</a>
+  <a href="#s8">CgiHandler — buildEnvp & startCgi</a>
+  <a href="#s9">CgiHandler — finishCgi</a>
+  <a href="#s10">Fluxo completo</a>
+</nav>
+
+<div class="page">
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s0">
+  <div class="overview">
+    <h2>// O que este módulo faz e quem são suas 3 classes</h2>
+    <p><strong style="color:#90e0a8">HttpRequest</strong> — recebe o texto cru da requisição HTTP (já completo, acumulado pelo Client) e o parseia em estrutura de dados: método, URI, versão, headers (map), body. É construído uma única vez por requisição e lido por HttpResponse e CgiHandler.</p>
+    <p><strong style="color:#90e0a8">HttpResponse</strong> — recebe o HttpRequest e o ServerConfig, toma todas as decisões de roteamento (qual location casa, qual método, CGI ou arquivo, redirect) e gera a resposta. É o maior arquivo do módulo e o cérebro do servidor.</p>
+    <p><strong style="color:#90e0a8">CgiHandler</strong> — classe utilitária estática. Não guarda estado. É chamada pelo WebServ quando HttpResponse sinaliza que uma requisição precisa de CGI. Faz fork+pipe+execve e depois parseia a saída do processo filho.</p>
+    <p>Fluxo: <strong>WebServ</strong> cria um <strong>HttpRequest</strong>, passa para <strong>HttpResponse::generateResponse()</strong>. Se needsCgi → <strong>WebServ</strong> chama <strong>CgiHandler::startCgi()</strong>. Quando CGI termina → <strong>WebServ</strong> chama <strong>CgiHandler::finishCgi()</strong>.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s1">
+  <div class="sec-head">
+    <span class="sec-num">01</span>
+    <span class="sec-title">HttpRequest — o construtor e o parse do body</span>
+    <span class="sec-file">HttpRequest.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="name">HttpRequest</span>(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">rawData</span>)
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">Recebe de quem / quando</div>
+        <div class="func-text">Chamado em <code>WebServ::handleClientRead()</code> quando <code>client->isRequestComplete()</code> retorna true. Recebe a string crua completa — headers + body — já acumulada no <code>requestBuffer</code> do Client. A partir desse momento o Client não precisa mais do buffer de rede, só da estrutura parseada.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Primeira decisão — separar headers do body</div>
+        <div class="func-text">Busca <code>\r\n\r\n</code> com <code>rawData.find()</code>. Esse é o separador definido pelo RFC HTTP — uma linha em branco entre os headers e o body. Tudo antes é <code>headerPart</code>, tudo depois é <code>rawBody</code>. Se não encontrar <code>\r\n\r\n</code>, trata tudo como header (requisição sem body).</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Segunda decisão — como tratar o rawBody</div>
+        <div class="func-text">Verifica se o headerPart contém <code>Transfer-Encoding: chunked</code> (case-insensitive — testa dois casos). Se sim → <code>body = decodeChunkedBody(rawBody)</code>. Se não → procura <code>Content-Length</code> (também case-insensitive, três variantes) e corta o rawBody no tamanho exato. Isso é necessário porque o TCP pode ter entregue bytes a mais ao final do buffer.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Terceira decisão — parsear o headerPart linha a linha</div>
+        <div class="func-text">Cria um <code>istringstream</code> sobre o headerPart. Lê a primeira linha com <code>getline</code> → <code>parseRequestLine()</code>. Lê cada linha seguinte → <code>parseHeader()</code>. Antes de passar para cada parser, remove o <code>\r</code> do final da linha se existir — porque <code>getline</code> para no <code>\n</code> mas deixa o <code>\r</code> que precede ele no HTTP.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">HttpRequest.cpp — construtor — estrutura principal</div>
+        <pre><span class="type">size_t</span> <span class="var">headerEnd</span> = rawData.<span class="fn">find</span>(<span class="str">"\r\n\r\n"</span>);
+<span class="type">std::string</span> <span class="var">headerPart</span>;
+<span class="kw">if</span> (<span class="var">headerEnd</span> != <span class="type">std::string</span>::npos) {
+    <span class="var">headerPart</span> = rawData.<span class="fn">substr</span>(<span class="num">0</span>, <span class="var">headerEnd</span>);
+    <span class="type">std::string</span> <span class="var">rawBody</span> = rawData.<span class="fn">substr</span>(<span class="var">headerEnd</span> + <span class="num">4</span>); <span class="cmt">// +4 pula os 4 chars de \r\n\r\n</span>
+
+    <span class="kw">bool</span> <span class="var">isChunked</span> = (headerPart.<span class="fn">find</span>(<span class="str">"Transfer-Encoding: chunked"</span>) != <span class="type">std::string</span>::npos)
+                 || (headerPart.<span class="fn">find</span>(<span class="str">"transfer-encoding: chunked"</span>) != <span class="type">std::string</span>::npos);
+    <span class="kw">if</span> (<span class="var">isChunked</span>)
+        <span class="var">body</span> = <span class="fn">decodeChunkedBody</span>(<span class="var">rawBody</span>);
+    <span class="kw">else</span> {
+        <span class="cmt">// extrai Content-Length com trim de espaços</span>
+        <span class="kw">if</span> (<span class="var">contentLength</span> > <span class="num">0</span> && <span class="var">contentLength</span> <= rawBody.<span class="fn">length</span>())
+            <span class="var">body</span> = rawBody.<span class="fn">substr</span>(<span class="num">0</span>, <span class="var">contentLength</span>);
+        <span class="kw">else</span>
+            <span class="var">body</span> = rawBody; <span class="cmt">// sem Content-Length: usa o rawBody inteiro</span>
+    }
+}
+<span class="kw">else</span>
+    <span class="var">headerPart</span> = rawData; <span class="cmt">// sem \r\n\r\n: tudo é header, body é ""</span>
+
+<span class="cmt">// parseia linha a linha via istringstream</span>
+<span class="type">std::istringstream</span> <span class="var">stream</span>(<span class="var">headerPart</span>);
+<span class="type">std::string</span> <span class="var">line</span>;
+<span class="kw">if</span> (<span class="type">std::getline</span>(<span class="var">stream</span>, <span class="var">line</span>)) {
+    <span class="kw">if</span> (!line.<span class="fn">empty</span>() && line[line.<span class="fn">length</span>() - <span class="num">1</span>] == <span class="str">'\r'</span>)
+        line.<span class="fn">erase</span>(line.<span class="fn">length</span>() - <span class="num">1</span>); <span class="cmt">// remove o \r antes do \n</span>
+    <span class="fn">parseRequestLine</span>(line);
+}
+<span class="kw">while</span> (<span class="type">std::getline</span>(<span class="var">stream</span>, <span class="var">line</span>)) {
+    <span class="kw">if</span> (!line.<span class="fn">empty</span>() && line[line.<span class="fn">length</span>() - <span class="num">1</span>] == <span class="str">'\r'</span>)
+        line.<span class="fn">erase</span>(line.<span class="fn">length</span>() - <span class="num">1</span>);
+    <span class="fn">parseHeader</span>(line);
+}</pre>
+      </div>
+
+      <div class="box box-syntax">
+        <strong>Por que <code>rawData.substr(headerEnd + 4)</code>?</strong> — <code>headerEnd</code> é a posição do primeiro <code>\r</code> de <code>\r\n\r\n</code>. Esses 4 bytes (<code>\r</code><code>\n</code><code>\r</code><code>\n</code>) são o separador e não pertencem nem ao header nem ao body. Pular exatamente 4 posiciona o cursor no primeiro byte do body.
+      </div>
+
+      <div class="box box-syntax">
+        <strong>Remoção do <code>\r</code> final:</strong> o HTTP usa <code>\r\n</code> como terminador de linha. <code>std::getline</code> quebra no <code>\n</code> mas deixa o <code>\r</code> na string. Sem a remoção, cada header teria um <code>\r</code> no final: <code>"Content-Type: text/html\r"</code> — causaria falha no <code>headers.find()</code> mais tarde. O idioma <code>line[line.length()-1] == '\r'</code> é a verificação antes do erase.
+      </div>
+
+      <div class="box box-note">
+        <strong>Content-Length — 3 variantes de case:</strong> o código busca <code>"Content-Length: "</code>, <code>"Content-length: "</code> e <code>"content-length: "</code>. Isso porque o RFC HTTP diz que header names são case-insensitive, mas o servidor armazena exatamente como recebeu. Clientes diferentes podem usar cases diferentes.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s2">
+  <div class="sec-head">
+    <span class="sec-num">02</span>
+    <span class="sec-title">HttpRequest — decodeChunkedBody()</span>
+    <span class="sec-file">HttpRequest.cpp — função estática local</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">static</span> <span class="type">std::string</span> <span class="name">decodeChunkedBody</span>(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">raw</span>)
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">O que é chunked transfer encoding</div>
+        <div class="func-text">Quando o cliente não sabe o tamanho total do body antecipadamente, ele envia em "chunks". Cada chunk começa com o tamanho em hexadecimal numa linha, seguido pelo dado, seguido por <code>\r\n</code>. O body termina com um chunk de tamanho <code>0</code>. Exemplo: <code>5\r\nHello\r\n3\r\nbye\r\n0\r\n\r\n</code> → "Hellobye".</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">O algoritmo — loop de desempacotamento</div>
+        <div class="func-text"><strong>1.</strong> Encontra o fim da linha de tamanho com <code>find("\r\n", pos)</code>.<br>
+        <strong>2.</strong> Extrai a string hex (<code>substr(pos, lineEnd - pos)</code>). Remove extensões opcionais após <code>;</code> (chunk extensions são raras mas RFC-válidas).<br>
+        <strong>3.</strong> Converte hex para número com <code>istringstream + std::hex</code>. Se chunkSize == 0 → encerra o loop.<br>
+        <strong>4.</strong> Avança pos para depois do <code>\r\n</code>, copia exatamente <code>chunkSize</code> bytes para <code>decoded</code> com <code>append(raw, pos, chunkSize)</code>.<br>
+        <strong>5.</strong> Avança pos sobre o dado + o <code>\r\n</code> que vem depois do chunk.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">HttpRequest.cpp — decodeChunkedBody()</div>
+        <pre><span class="type">std::string</span> <span class="var">decoded</span>;
+<span class="type">size_t</span> <span class="var">pos</span> = <span class="num">0</span>;
+<span class="kw">while</span> (<span class="var">pos</span> < raw.<span class="fn">length</span>()) {
+    <span class="type">size_t</span> <span class="var">lineEnd</span> = raw.<span class="fn">find</span>(<span class="str">"\r\n"</span>, <span class="var">pos</span>);
+    <span class="kw">if</span> (<span class="var">lineEnd</span> == <span class="type">std::string</span>::npos) <span class="kw">break</span>; <span class="cmt">// dado incompleto</span>
+
+    <span class="type">std::string</span> <span class="var">hexSize</span> = raw.<span class="fn">substr</span>(<span class="var">pos</span>, <span class="var">lineEnd</span> - <span class="var">pos</span>);
+    <span class="type">size_t</span> <span class="var">semiPos</span> = hexSize.<span class="fn">find</span>(<span class="str">';'</span>);
+    <span class="kw">if</span> (<span class="var">semiPos</span> != <span class="type">std::string</span>::npos)
+        <span class="var">hexSize</span> = hexSize.<span class="fn">substr</span>(<span class="num">0</span>, <span class="var">semiPos</span>); <span class="cmt">// remove chunk extensions</span>
+
+    <span class="type">std::istringstream</span> <span class="var">hexStream</span>(<span class="var">hexSize</span>);
+    <span class="type">unsigned long</span> <span class="var">chunkSize</span>;
+    <span class="kw">if</span> (!(hexStream >> <span class="type">std::hex</span> >> <span class="var">chunkSize</span>) || !hexStream.<span class="fn">eof</span>()) <span class="kw">break</span>; <span class="cmt">// hex inválido</span>
+    <span class="kw">if</span> (<span class="var">chunkSize</span> == <span class="num">0</span>) <span class="kw">break</span>;                           <span class="cmt">// chunk final</span>
+
+    <span class="var">pos</span> = <span class="var">lineEnd</span> + <span class="num">2</span>;                                  <span class="cmt">// pula o \r\n do tamanho</span>
+    <span class="kw">if</span> (<span class="var">pos</span> + <span class="var">chunkSize</span> > raw.<span class="fn">length</span>()) <span class="kw">break</span>;          <span class="cmt">// dado incompleto</span>
+    <span class="var">decoded</span>.<span class="fn">append</span>(raw, <span class="var">pos</span>, <span class="var">chunkSize</span>);               <span class="cmt">// copia o chunk</span>
+    <span class="var">pos</span> += <span class="var">chunkSize</span>;
+    <span class="kw">if</span> (<span class="var">pos</span> + <span class="num">2</span> <= raw.<span class="fn">length</span>()) <span class="var">pos</span> += <span class="num">2</span>;             <span class="cmt">// pula o \r\n após o dado</span>
+}
+<span class="kw">return</span> (<span class="var">decoded</span>);</pre>
+      </div>
+
+      <div class="box box-syntax">
+        <code>hexStream >> std::hex >> chunkSize</code> — <code>std::hex</code> é um manipulador de stream que instrui o operador <code>&gt;&gt;</code> a interpretar o próximo número como hexadecimal. Sem ele, "a" seria interpretado como falha de parse. Com ele, "a" = 10, "ff" = 255. O <code>hexStream.eof()</code> verifica que todo o string foi consumido — garante que "5x" (hex parcialmente inválido) seria rejeitado.
+      </div>
+
+      <div class="box box-syntax">
+        <code>decoded.append(raw, pos, chunkSize)</code> — versão de <code>append</code> que recebe (string_fonte, posição_início, quantidade). Mais eficiente que <code>decoded += raw.substr(pos, chunkSize)</code> porque não cria uma string temporária intermediária — copia diretamente do raw para decoded.
+      </div>
+
+      <div class="box box-why">
+        É uma função <code>static</code> livre (fora da classe, antes do construtor) em vez de membro. Isso a torna invisível fora do arquivo — <code>static</code> em funções livres em C++ (e C) tem o efeito de limitar o linkage ao arquivo de compilação. É uma forma de "função privada de arquivo" sem precisar declará-la no header.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s3">
+  <div class="sec-head">
+    <span class="sec-num">03</span>
+    <span class="sec-title">HttpRequest — parseRequestLine() e parseHeader()</span>
+    <span class="sec-file">HttpRequest.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> HttpRequest::<span class="name">parseRequestLine</span>(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">line</span>)
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">O que valida e por que a ordem importa</div>
+        <div class="func-text">Lê os 3 tokens da request line: método, URI, versão. Depois tenta ler um 4º token — se conseguir, a linha tem tokens demais e é inválida. Depois valida cada campo individualmente. Só seta <code>valid = true</code> ao final, se tudo passou — é um padrão pessimista: assume inválido até provar o contrário.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">HttpRequest.cpp — parseRequestLine()</div>
+        <pre><span class="type">std::istringstream</span> <span class="var">stream</span>(<span class="var">line</span>);
+<span class="type">std::string</span> <span class="var">tempMethod</span>, <span class="var">tempUri</span>, <span class="var">tempVersion</span>;
+<span class="kw">if</span> (!(stream >> <span class="var">tempMethod</span> >> <span class="var">tempUri</span> >> <span class="var">tempVersion</span>))
+    <span class="kw">return</span>;                          <span class="cmt">// menos de 3 tokens → inválido</span>
+<span class="type">std::string</span> <span class="var">extraToken</span>;
+<span class="kw">if</span> (stream >> <span class="var">extraToken</span>)
+    <span class="kw">return</span>;                          <span class="cmt">// mais de 3 tokens → inválido</span>
+
+<span class="cmt">// método: só letras maiúsculas (A-Z)</span>
+<span class="kw">if</span> (<span class="var">tempMethod</span>.<span class="fn">empty</span>() || <span class="var">tempMethod</span>.<span class="fn">find_first_not_of</span>(<span class="str">"ABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>) != <span class="type">std::string</span>::npos)
+    <span class="kw">return</span>;
+
+<span class="cmt">// URI: deve começar com '/'</span>
+<span class="kw">if</span> (<span class="var">tempUri</span>.<span class="fn">empty</span>() || <span class="var">tempUri</span>[<span class="num">0</span>] != <span class="str">'/'</span>)
+    <span class="kw">return</span>;
+
+<span class="cmt">// versão: deve começar com "HTTP/"</span>
+<span class="kw">if</span> (<span class="var">tempVersion</span>.<span class="fn">find</span>(<span class="str">"HTTP/"</span>) != <span class="num">0</span>)
+    <span class="kw">return</span>;
+
+<span class="var">method</span> = <span class="var">tempMethod</span>;
+<span class="var">uri</span>    = <span class="var">tempUri</span>;
+<span class="var">version</span> = <span class="var">tempVersion</span>;
+<span class="var">valid</span>  = <span class="kw">true</span>;  <span class="cmt">// só aqui → tudo válido</span></pre>
+      </div>
+
+      <div class="box box-syntax">
+        <code>find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ")</code> — retorna a posição do primeiro caractere que NÃO está no conjunto. Se retornar <code>npos</code>, todos os caracteres estão no conjunto — o método é pura maiúscula. É o idioma C++ para "string contém apenas estes caracteres".
+      </div>
+
+      <div class="box box-syntax">
+        <code>tempVersion.find("HTTP/") != 0</code> — <code>find()</code> retorna a posição onde a substring foi encontrada. Se retornar 0, a string começa com "HTTP/". Se retornar qualquer outra coisa (incluindo npos), não começa com "HTTP/". Isso é mais explícito que <code>tempVersion.substr(0,5) == "HTTP/"</code> — sem criar substring temporária.
+      </div>
+
+      <div class="box box-why">
+        Variáveis temporárias (<code>tempMethod</code>, <code>tempUri</code>, <code>tempVersion</code>) antes de atribuir aos atributos. Isso garante atomicidade: ou todos os três são válidos e atribuídos, ou nenhum é. Sem temporárias, uma falha a meio do parse deixaria os atributos em estado inconsistente.
+      </div>
+
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> HttpRequest::<span class="name">parseHeader</span>(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">line</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">O que faz</div>
+        <div class="func-text">Encontra o primeiro <code>:</code> na linha. Tudo antes é a chave, tudo depois é o valor (com trim de espaços/tabs no início). Insere em <code>headers</code> (map). Se não encontrar <code>:</code>, ignora a linha silenciosamente — linha vazia ou malformada não causa erro.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">HttpRequest.cpp — parseHeader()</div>
+        <pre><span class="type">size_t</span> <span class="var">colon</span> = line.<span class="fn">find</span>(<span class="str">':'</span>);
+<span class="kw">if</span> (<span class="var">colon</span> != <span class="type">std::string</span>::npos) {
+    <span class="type">std::string</span> <span class="var">key</span>   = line.<span class="fn">substr</span>(<span class="num">0</span>, <span class="var">colon</span>);
+    <span class="type">std::string</span> <span class="var">value</span> = line.<span class="fn">substr</span>(<span class="var">colon</span> + <span class="num">1</span>);
+    <span class="type">size_t</span> <span class="var">start</span> = value.<span class="fn">find_first_not_of</span>(<span class="str">" \t"</span>); <span class="cmt">// trim espaços iniciais</span>
+    <span class="kw">if</span> (<span class="var">start</span> != <span class="type">std::string</span>::npos)
+        <span class="var">value</span> = value.<span class="fn">substr</span>(<span class="var">start</span>);
+    <span class="var">headers</span>[<span class="var">key</span>] = <span class="var">value</span>; <span class="cmt">// insere ou sobrescreve no map</span>
+}</pre>
+      </div>
+      <div class="box box-note">
+        <code>headers[key] = value</code> no <code>std::map</code> tem comportamento de inserção-ou-substituição: se a chave já existe, sobrescreve; se não, insere. Para headers HTTP isso é adequado — se o cliente mandar dois <code>Content-Type</code>, o segundo vence. O map mantém as chaves em ordem alfabética (por ser uma BST internamente) — não importa para o servidor, mas é relevante saber.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s4">
+  <div class="sec-head">
+    <span class="sec-num">04</span>
+    <span class="sec-title">HttpRequest — getCookie()</span>
+    <span class="sec-file">HttpRequest.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="type">std::string</span> HttpRequest::<span class="name">getCookie</span>(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">name</span>) <span class="kw">const</span>
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">O formato do header Cookie</div>
+        <div class="func-text">O browser envia todos os cookies em um único header: <code>Cookie: session_id=abc123; user=joao; theme=dark</code>. São pares <code>nome=valor</code> separados por <code>;</code>. getCookie recebe o nome desejado e percorre esse header manualmente para encontrar o valor.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">O algoritmo de busca</div>
+        <div class="func-text"><strong>1.</strong> Busca o header <code>"Cookie"</code> no map. Se não existir → retorna <code>""</code>.<br>
+        <strong>2.</strong> Loop: encontra o próximo <code>;</code> para delimitar o cookie atual. <code>substr(pos, semiPos - pos)</code> extrai um par "nome=valor".<br>
+        <strong>3.</strong> Encontra o <code>=</code> dentro do par. Divide em nome e valor. Aplica trim (find_first_not_of + find_last_not_of) no nome.<br>
+        <strong>4.</strong> Se o nome casar com o procurado → retorna o valor. Avança pos para depois do <code>;</code>.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">HttpRequest.cpp — getCookie() — núcleo do loop</div>
+        <pre><span class="type">size_t</span> <span class="var">pos</span> = <span class="num">0</span>;
+<span class="kw">while</span> (<span class="var">pos</span> < cookieHeader.<span class="fn">length</span>()) {
+    <span class="type">size_t</span> <span class="var">semiPos</span> = cookieHeader.<span class="fn">find</span>(<span class="str">';'</span>, <span class="var">pos</span>);
+    <span class="kw">if</span> (<span class="var">semiPos</span> == <span class="type">std::string</span>::npos)
+        <span class="var">semiPos</span> = cookieHeader.<span class="fn">length</span>(); <span class="cmt">// último cookie (sem ; no final)</span>
+    <span class="type">std::string</span> <span class="var">cookie</span> = cookieHeader.<span class="fn">substr</span>(<span class="var">pos</span>, <span class="var">semiPos</span> - <span class="var">pos</span>);
+    <span class="type">size_t</span> <span class="var">eqPos</span> = cookie.<span class="fn">find</span>(<span class="str">'='</span>);
+    <span class="kw">if</span> (<span class="var">eqPos</span> != <span class="type">std::string</span>::npos) {
+        <span class="type">std::string</span> <span class="var">cookieName</span> = cookie.<span class="fn">substr</span>(<span class="num">0</span>, <span class="var">eqPos</span>);
+        <span class="cmt">// trim: remove espaços no inicio e fim do nome</span>
+        <span class="type">size_t</span> <span class="var">start</span> = cookieName.<span class="fn">find_first_not_of</span>(<span class="str">" \t"</span>);
+        <span class="type">size_t</span> <span class="var">end</span>   = cookieName.<span class="fn">find_last_not_of</span>(<span class="str">" \t"</span>);
+        <span class="kw">if</span> (<span class="var">start</span> != <span class="type">std::string</span>::npos)
+            <span class="var">cookieName</span> = cookieName.<span class="fn">substr</span>(<span class="var">start</span>, <span class="var">end</span> - <span class="var">start</span> + <span class="num">1</span>);
+        <span class="kw">if</span> (<span class="var">cookieName</span> == <span class="var">name</span>)
+            <span class="kw">return</span> (cookie.<span class="fn">substr</span>(<span class="var">eqPos</span> + <span class="num">1</span>)); <span class="cmt">// retorna o valor</span>
+    }
+    <span class="var">pos</span> = <span class="var">semiPos</span> + <span class="num">1</span>; <span class="cmt">// avança para o próximo cookie</span>
+}
+<span class="kw">return</span> (<span class="str">""</span>);</pre>
+      </div>
+
+      <div class="box box-syntax">
+        <code>find_last_not_of(" \t")</code> — o par <code>find_first_not_of</code> + <code>find_last_not_of</code> é o idioma de trim bidirecional em C++98. O primeiro encontra onde o conteúdo real começa, o segundo onde termina. <code>substr(start, end - start + 1)</code> extrai só a parte não-espaço. O <code>+1</code> no tamanho é necessário porque end é um índice (inclusivo) e substr espera um comprimento.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s5">
+  <div class="sec-head">
+    <span class="sec-num">05</span>
+    <span class="sec-title">HttpResponse — generateResponse() — o dispatcher</span>
+    <span class="sec-file">HttpResponse.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="type">std::string</span> HttpResponse::<span class="name">generateResponse</span>(<span class="kw">const</span> <span class="type">HttpRequest</span> &amp;<span class="param">req</span>, <span class="kw">const</span> <span class="type">ServerConfig</span> &amp;<span class="param">serverConfig</span>, <span class="type">std::map</span>&lt;<span class="type">std::string</span>, <span class="type">std::map</span>&lt;<span class="type">std::string</span>, <span class="type">std::string</span>&gt;&gt; &amp;<span class="param">sessions</span>)
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">Recebe de quem / quando</div>
+        <div class="func-text">Chamada em <code>WebServ::handleClientRead()</code> logo após construir o <code>HttpRequest</code>. Recebe o request parseado, o ServerConfig correspondente ao socket que aceitou a conexão, e uma referência ao mapa de sessões do WebServ (passado por referência porque pode ser modificado no login).</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Etapa 0 — URIs especiais de sessão</div>
+        <div class="func-text">Antes de qualquer roteamento, testa se a URI é <code>/session_login</code> ou <code>/session_profile</code>. Se for, processa e retorna imediatamente via <code>buildResponseString()</code>. Essas rotas são hardcoded — não passam pelo sistema de location matching. É uma decisão de implementação do bônus: simples e direta.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Etapa 1 — Longest-prefix matching das locations</div>
+        <div class="func-text">Remove barra final da URI de busca (<code>searchUri</code>). Itera sobre todas as locations do ServerConfig. Para cada location, remove barra final do path também, verifica se <code>searchUri</code> começa com <code>locPath</code> E uma das três condições seguintes: a URI tem o mesmo tamanho que locPath (match exato), o próximo caractere é <code>/</code> (evita que <code>/dir</code> case com <code>/directory</code>), ou a própria location é a raiz <code>/</code> — que funciona como catch-all e deve casar com qualquer URI, já que toda URI HTTP começa com <code>/</code>. Guarda a location com o path mais longo que casou, então uma location mais específica como <code>/uploads/</code> sempre vence sobre <code>/</code> quando ambas casam.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">HttpResponse.cpp — generateResponse() — location matching</div>
+        <pre><span class="cmt">// remove barra final para comparação uniforme: "/uploads/" → "/uploads"</span>
+<span class="kw">if</span> (<span class="var">searchUri</span>.<span class="fn">length</span>() > <span class="num">1</span> && <span class="var">searchUri</span>[<span class="var">searchUri</span>.<span class="fn">length</span>() - <span class="num">1</span>] == <span class="str">'/'</span>)
+    <span class="var">searchUri</span>.<span class="fn">erase</span>(<span class="var">searchUri</span>.<span class="fn">length</span>() - <span class="num">1</span>);
+
+<span class="type">size_t</span> <span class="var">longestMatch</span> = <span class="num">0</span>;
+<span class="kw">for</span> (<span class="type">size_t</span> <span class="var">i</span> = <span class="num">0</span>; <span class="var">i</span> < locations.<span class="fn">size</span>(); ++<span class="var">i</span>) {
+    <span class="type">std::string</span> <span class="var">locPath</span> = locations[<span class="var">i</span>].<span class="fn">getPath</span>();
+    <span class="kw">if</span> (<span class="var">locPath</span>.<span class="fn">length</span>() > <span class="num">1</span> && <span class="var">locPath</span>[<span class="var">locPath</span>.<span class="fn">length</span>() - <span class="num">1</span>] == <span class="str">'/'</span>)
+        <span class="var">locPath</span>.<span class="fn">erase</span>(<span class="var">locPath</span>.<span class="fn">length</span>() - <span class="num">1</span>);
+
+    <span class="kw">if</span> (<span class="var">searchUri</span>.<span class="fn">find</span>(<span class="var">locPath</span>) == <span class="num">0</span>) {  <span class="cmt">// começa com locPath</span>
+        <span class="kw">if</span> (<span class="var">searchUri</span>.<span class="fn">length</span>() == <span class="var">locPath</span>.<span class="fn">length</span>() <span class="cmt">// match exato</span>
+            || <span class="var">searchUri</span>[<span class="var">locPath</span>.<span class="fn">length</span>()] == <span class="str">'/'</span> <span class="cmt">// ou próximo char é /</span>
+            || <span class="var">locPath</span> == <span class="str">"/"</span>) {              <span class="cmt">// ou a location é a raiz — catch-all</span>
+            <span class="kw">if</span> (<span class="var">locPath</span>.<span class="fn">length</span>() > <span class="var">longestMatch</span>) {
+                <span class="var">longestMatch</span> = <span class="var">locPath</span>.<span class="fn">length</span>();
+                <span class="var">matchedLoc</span> = &amp;locations[<span class="var">i</span>];
+            }
+        }
+    }
+}</pre>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Etapa 2 — Checagens em cascata com early return</div>
+        <div class="func-text">
+          Após encontrar a location, cada verificação falha com <code>return(buildResponseString())</code>:<br>
+          <strong>a)</strong> Nenhuma location casou → 404.<br>
+          <strong>b)</strong> Location tem redirect → status 301/302 + Location header.<br>
+          <strong>c)</strong> Método não permitido → 405. Tem uma exceção: se a location tem CGI e o método é POST, força <code>methodAllowed = true</code> mesmo que POST não esteja na lista — permite CGI POST mesmo em locations sem POST explícito.<br>
+          <strong>d)</strong> Body excede maxBody → 413.
+        </div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Etapa 3 — Construção do targetFile</div>
+        <div class="func-text">Combina o root da location (ou do servidor) com a parte da URI após o path da location. Exemplo: URI <code>/uploads/foto.jpg</code>, location path <code>/uploads/</code>, root <code>www/uploads</code> → targetFile = <code>www/uploads/foto.jpg</code>.<br>
+        Caso especial: se a URI bate exatamente no path da location (ex: URI <code>/directory</code> = location <code>/directory/</code>), usa o index da location diretamente. Depois um segundo <code>stat()</code> verifica se targetFile é diretório — se for, acrescenta o index.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Etapa 4 — CGI ou método handler</div>
+        <div class="func-text">Se a extensão do targetFile bate com o <code>cgi_ext</code> da location → seta <code>needsCgi = true</code>, salva os paths e retorna <code>""</code> (string vazia). O WebServ detecta o <code>needsCgi</code> e inicia o CGI. Se não for CGI → despacha para <code>handleGet</code>, <code>handlePost</code> ou <code>handleDelete</code> conforme o método.</div>
+      </div>
+
+      <div class="box box-warn">
+        <strong>Retorno <code>""</code> no caso CGI</strong> é um contrato entre HttpResponse e WebServ. O WebServ em <code>handleClientRead()</code> faz: <code>if (resp.needsCgiExec()) { startCgi(); return; }</code>. A string vazia sinaliza que a resposta ainda não está pronta — será gerada pelo caminho do CGI. Qualquer outro retorno é tratado como resposta HTTP completa a ser enviada.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s6">
+  <div class="sec-head">
+    <span class="sec-num">06</span>
+    <span class="sec-title">HttpResponse — handleGet, handlePost, handleDelete</span>
+    <span class="sec-file">HttpResponse.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> HttpResponse::<span class="name">handleGet</span>(<span class="param">req</span>, <span class="param">serverConfig</span>, <span class="param">targetFile</span>, <span class="param">matchedLoc</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">Dois caminhos: diretório ou arquivo</div>
+        <div class="func-text"><strong>Diretório:</strong> <code>stat()</code> confirma que é diretório (<code>S_ISDIR</code>). Se <code>autoindex == true</code>: abre com <code>opendir()</code>, itera com <code>readdir()</code>, gera HTML com links, fecha com <code>closedir()</code>. Se <code>autoindex == false</code>: retorna 404.<br><br>
+        <strong>Arquivo regular:</strong> <code>stat()</code> confirma <code>S_ISREG</code>. Detecta Content-Type pela extensão (<code>.css</code>, <code>.png</code>, <code>.jpg</code>, default <code>text/html</code>). Seta <code>isFileResponse = true</code>, salva o <code>filePath</code> e <code>fileSize = fileStat.st_size</code>. O arquivo em si <strong>não é aberto aqui</strong> — será lido em chunks pelo Client durante o envio.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">HttpResponse.cpp — handleGet() — autoindex e fileResponse</div>
+        <pre><span class="kw">if</span> (<span class="fn">stat</span>(<span class="var">targetFile</span>.<span class="fn">c_str</span>(), &amp;<span class="var">fileStat</span>) == <span class="num">0</span> &amp;&amp; <span class="fn">S_ISDIR</span>(<span class="var">fileStat</span>.st_mode)) {
+    <span class="kw">if</span> (<span class="var">matchedLoc</span> && <span class="var">matchedLoc</span>-><span class="fn">getAutoindex</span>()) {
+        <span class="type">DIR</span> *<span class="var">dir</span> = <span class="fn">opendir</span>(<span class="var">targetFile</span>.<span class="fn">c_str</span>());
+        <span class="kw">if</span> (!<span class="var">dir</span>) { <span class="fn">setErrorResponse</span>(<span class="num">403</span>, ...); <span class="kw">return</span>; }
+        <span class="type">std::ostringstream</span> <span class="var">page</span>;
+        <span class="kw">struct</span> <span class="type">dirent</span> *<span class="var">entry</span>;
+        <span class="kw">while</span> ((<span class="var">entry</span> = <span class="fn">readdir</span>(<span class="var">dir</span>)) != <span class="kw">NULL</span>) {
+            <span class="type">std::string</span> <span class="var">name</span> = <span class="var">entry</span>->d_name;
+            <span class="kw">if</span> (<span class="var">name</span> == <span class="str">"."</span>) <span class="kw">continue</span>;     <span class="cmt">// oculta "." mas mostra ".."</span>
+            <span class="var">page</span> << <span class="str">"&lt;a href=\""</span> << <span class="var">name</span> << <span class="str">"\"&gt;"</span> << <span class="var">name</span> << <span class="str">"&lt;/a&gt;\n"</span>;
+        }
+        <span class="fn">closedir</span>(<span class="var">dir</span>);
+        <span class="var">body</span> = <span class="var">page</span>.<span class="fn">str</span>();
+    }
+    <span class="kw">else</span> <span class="fn">setErrorResponse</span>(<span class="num">404</span>, ...);
+    <span class="kw">return</span>;
+}
+<span class="kw">if</span> (<span class="fn">stat</span>(<span class="var">targetFile</span>.<span class="fn">c_str</span>(), &amp;<span class="var">fileStat</span>) == <span class="num">0</span> &amp;&amp; <span class="fn">S_ISREG</span>(<span class="var">fileStat</span>.st_mode)) {
+    <span class="cmt">// detecta Content-Type pela extensão</span>
+    <span class="var">isFileResponse</span> = <span class="kw">true</span>;
+    <span class="var">filePath</span> = <span class="var">targetFile</span>;
+    <span class="var">fileSize</span> = <span class="var">fileStat</span>.st_size; <span class="cmt">// tamanho para o Content-Length</span>
+    <span class="var">statusCode</span> = <span class="str">"200"</span>; <span class="var">statusMessage</span> = <span class="str">"OK"</span>;
+}
+<span class="kw">else</span> <span class="fn">setErrorResponse</span>(<span class="num">404</span>, ...);</pre>
+      </div>
+      <div class="box box-syntax">
+        <code>stat(path, &amp;fileStat)</code> — syscall POSIX que preenche um <code>struct stat</code> com metadados do arquivo (tamanho, tipo, permissões, timestamps). Retorna 0 em sucesso, -1 em erro. <code>S_ISDIR(fileStat.st_mode)</code> e <code>S_ISREG(fileStat.st_mode)</code> são macros que testam o campo <code>st_mode</code>. <code>fileStat.st_size</code> é o tamanho em bytes — usado como <code>Content-Length</code>.
+      </div>
+      <div class="box box-why">
+        <code>isFileResponse = true</code> em vez de ler o arquivo aqui: arquivos podem ser grandes (MB ou GB). Ler tudo em memória de uma vez seria impraticável. Com <code>isFileResponse</code>, o Client abre o arquivo depois e lê em chunks de 64KB por ciclo do poll(). O Content-Length ainda é correto porque usamos <code>st_size</code> do stat — sem precisar ler o conteúdo.
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> HttpResponse::<span class="name">handlePost</span>(<span class="param">req</span>, <span class="param">serverConfig</span>, <span class="param">targetFile</span>, <span class="param">matchedLoc</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">Parse de multipart/form-data — o upload de arquivo</div>
+        <div class="func-text">Verifica Content-Type pelo header. Se for <code>multipart/form-data</code>: extrai o boundary (<code>"boundary="</code> no header). O boundary delimita cada parte do multipart.<br>
+        Encontra o boundary no body, pula para o <code>\r\n\r\n</code> do part-header para chegar no conteúdo binário real. Extrai o filename do <code>Content-Disposition: form-data; name="file"; filename="foto.jpg"</code>. Encontra o fim do arquivo buscando o boundary novamente (recua 2 bytes para remover o <code>\r\n</code> antes do boundary). Abre um <code>ofstream</code> em modo binário e escreve com <code>ofs.write()</code>.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">HttpResponse.cpp — handlePost() — extração do arquivo</div>
+        <pre><span class="type">std::string</span> <span class="var">boundary</span> = <span class="str">"--"</span> + it->second.<span class="fn">substr</span>(<span class="var">pos</span> + <span class="num">9</span>); <span class="cmt">// "--" + valor após "boundary="</span>
+
+<span class="type">size_t</span> <span class="var">fileStart</span> = reqBody.<span class="fn">find</span>(<span class="var">boundary</span>);
+<span class="var">fileStart</span> += boundary.<span class="fn">length</span>();
+<span class="var">fileStart</span> = reqBody.<span class="fn">find</span>(<span class="str">"\r\n\r\n"</span>, <span class="var">fileStart</span>); <span class="cmt">// pula os headers do part</span>
+<span class="var">fileStart</span> += <span class="num">4</span>;                                     <span class="cmt">// pula o \r\n\r\n</span>
+
+<span class="type">size_t</span> <span class="var">fileEnd</span> = reqBody.<span class="fn">find</span>(<span class="var">boundary</span>, <span class="var">fileStart</span>); <span class="cmt">// próximo boundary = fim do arquivo</span>
+<span class="kw">if</span> (<span class="var">fileEnd</span> >= <span class="num">2</span>) <span class="var">fileEnd</span> -= <span class="num">2</span>;  <span class="cmt">// recua 2 para remover \r\n antes do boundary</span>
+
+<span class="type">std::ofstream</span> <span class="var">ofs</span>(savePath.<span class="fn">c_str</span>(), <span class="type">std::ios::out</span> | <span class="type">std::ios::binary</span>);
+<span class="kw">if</span> (<span class="var">ofs</span>) {
+    <span class="var">ofs</span>.<span class="fn">write</span>(reqBody.<span class="fn">c_str</span>() + <span class="var">fileStart</span>, <span class="var">fileEnd</span> - <span class="var">fileStart</span>); <span class="cmt">// escrita binária direta</span>
+    <span class="var">statusCode</span> = <span class="str">"201"</span>;
+}</pre>
+      </div>
+      <div class="box box-syntax">
+        <code>ofs.write(ptr, count)</code> — escreve exatamente <code>count</code> bytes do ponteiro <code>ptr</code> sem interpretação. É a forma correta para dados binários — em contraste com <code>ofs &lt;&lt;</code> que interpretaria bytes especiais (como <code>\0</code> em strings C). <code>reqBody.c_str() + fileStart</code> é aritmética de ponteiro: obtém um <code>const char*</code> apontando para a posição exata do início do arquivo no buffer.
+      </div>
+      <div class="box box-note">
+        Se o Content-Type não for multipart: o servidor aceita o body cru como dados e retorna 201. Isso é útil para testes com <code>curl -d "dados"</code> — sem precisar montar um multipart completo.
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> HttpResponse::<span class="name">handleDelete</span>(<span class="param">req</span>, <span class="param">serverConfig</span>, <span class="param">targetFile</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">O que faz — mais simples das 3</div>
+        <div class="func-text">Chama <code>unlink(targetFile.c_str())</code>. <code>unlink()</code> é a syscall POSIX para remover um arquivo do sistema de arquivos. Retorna 0 em sucesso → 200 OK. Retorna -1 em falha (arquivo não existe, permissão negada) → 404 Not Found. Não distingue permissão de inexistência — ambos viram 404.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s7">
+  <div class="sec-head">
+    <span class="sec-num">07</span>
+    <span class="sec-title">HttpResponse — buildResponseHeader, setErrorResponse, sessões</span>
+    <span class="sec-file">HttpResponse.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="type">std::string</span> HttpResponse::<span class="name">buildResponseHeader</span>() <span class="kw">const</span>
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">Constrói o header HTTP completo</div>
+        <div class="func-text">Usa <code>std::ostringstream</code> para concatenar o header de forma eficiente. Determina <code>bodyLen</code>: se <code>isFileResponse</code> usa <code>fileSize</code> (do stat), senão usa <code>body.length()</code>. Adiciona <code>Location:</code> apenas se for 301/302 e <code>redirectUrl</code> não for vazio. Itera o vector <code>cookies</code> e adiciona um <code>Set-Cookie:</code> por linha. Sempre termina com <code>Connection: close\r\n\r\n</code>.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">HttpResponse.cpp — buildResponseHeader()</div>
+        <pre><span class="type">std::ostringstream</span> <span class="var">response</span>;
+<span class="type">size_t</span> <span class="var">bodyLen</span> = <span class="var">isFileResponse</span> ? <span class="var">fileSize</span> : body.<span class="fn">length</span>();
+<span class="var">response</span> << <span class="str">"HTTP/1.1 "</span> << <span class="var">statusCode</span> << <span class="str">" "</span> << <span class="var">statusMessage</span> << <span class="str">"\r\n"</span>;
+<span class="var">response</span> << <span class="str">"Content-Type: "</span>   << <span class="var">contentType</span> << <span class="str">"\r\n"</span>;
+<span class="var">response</span> << <span class="str">"Content-Length: "</span> << <span class="var">bodyLen</span>      << <span class="str">"\r\n"</span>;
+<span class="kw">if</span> ((<span class="var">statusCode</span> == <span class="str">"301"</span> || <span class="var">statusCode</span> == <span class="str">"302"</span>) && !<span class="var">redirectUrl</span>.<span class="fn">empty</span>())
+    <span class="var">response</span> << <span class="str">"Location: "</span> << <span class="var">redirectUrl</span> << <span class="str">"\r\n"</span>;
+<span class="kw">for</span> (<span class="type">size_t</span> <span class="var">i</span> = <span class="num">0</span>; <span class="var">i</span> < <span class="var">cookies</span>.<span class="fn">size</span>(); ++<span class="var">i</span>)
+    <span class="var">response</span> << <span class="str">"Set-Cookie: "</span> << <span class="var">cookies</span>[<span class="var">i</span>] << <span class="str">"\r\n"</span>;
+<span class="var">response</span> << <span class="str">"Connection: close\r\n"</span>;
+<span class="var">response</span> << <span class="str">"\r\n"</span>; <span class="cmt">// linha em branco que separa header do body</span>
+<span class="kw">return</span> (<span class="var">response</span>.<span class="fn">str</span>());</pre>
+      </div>
+      <div class="box box-syntax">
+        <code>std::ostringstream</code> é um string builder. O operador <code>&lt;&lt;</code> concatena ao buffer interno. <code>.str()</code> extrai a string final. É preferível a <code>string +=</code> repetido porque o ostringstream gerencia o buffer de forma mais eficiente — faz menos realocações. Também permite inserir tipos não-string (int, size_t) diretamente sem conversão manual.
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> HttpResponse::<span class="name">setErrorResponse</span>(<span class="type">int</span> <span class="param">code</span>, <span class="kw">const</span> <span class="type">ServerConfig</span> *<span class="param">srv</span> = <span class="kw">NULL</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">Por que recebe um ponteiro e não referência</div>
+        <div class="func-text">Ponteiro permite o valor <code>NULL</code> (argumento default). Quando chamado sem ServerConfig (ex: dentro de handlePost para erro de diretório), não precisa de srv. Com referência seria obrigatório passar um objeto válido. O código verifica <code>if (srv)</code> antes de usar — padrão "ponteiro opcional" em C++98.</div>
+      </div>
+      <div class="func-section">
+        <div class="func-label">Busca página de erro customizada</div>
+        <div class="func-text">Se <code>srv != NULL</code>: busca o código em <code>srv->getErrorPages()</code> (map). Se encontrar, chama <code>loadErrorPage(path, root)</code> que abre o arquivo e retorna o conteúdo. Se o arquivo existir e não for vazio → usa como body. Se falhar qualquer coisa → fallback para o HTML embutido <code>&lt;h1&gt;404 Not Found&lt;/h1&gt;</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">const</span> <span class="type">std::string</span> &amp;HttpResponse::<span class="name">getSessionData</span>(...) <span class="kw">const</span>
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">Por que retorna referência para string estática</div>
+        <div class="func-text">Quando a sessão ou a chave não existem, a função precisa retornar algo. Não pode retornar uma string temporária por referência — ela seria destruída ao sair da função. A solução é uma <code>static std::string emptyStr = ""</code>: ela existe durante toda a vida do programa. Retornar <code>emptyStr</code> por referência é seguro. É um padrão comum em C++98 para "retorna referência ou string vazia sem copiar".</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">HttpResponse.cpp — getSessionData()</div>
+        <pre><span class="kw">static</span> <span class="type">std::string</span> <span class="var">emptyStr</span> = <span class="str">""</span>; <span class="cmt">// existe para sempre — pode retornar referência</span>
+<span class="type">std::map</span>&lt;...&gt;::<span class="type">const_iterator</span> <span class="var">it</span> = sessions.<span class="fn">find</span>(sessionId);
+<span class="kw">if</span> (<span class="var">it</span> == sessions.<span class="fn">end</span>())
+    <span class="kw">return</span> (<span class="var">emptyStr</span>); <span class="cmt">// sessão não existe</span>
+<span class="type">std::map</span>&lt;...&gt;::<span class="type">const_iterator</span> <span class="var">dataIt</span> = it->second.<span class="fn">find</span>(key);
+<span class="kw">if</span> (<span class="var">dataIt</span> == it->second.<span class="fn">end</span>())
+    <span class="kw">return</span> (<span class="var">emptyStr</span>); <span class="cmt">// chave não existe nessa sessão</span>
+<span class="kw">return</span> (<span class="var">dataIt</span>->second); <span class="cmt">// retorna referência ao valor real no map</span></pre>
+      </div>
+      <div class="box box-syntax">
+        <code>map::const_iterator</code> — iterador que não permite modificar os valores. Necessário porque a função é <code>const</code> (não modifica o objeto) e o mapa de sessões é <code>const</code>. Em C++11 seria possível usar <code>auto</code>, mas em C++98 o tipo completo é necessário. <code>it->second</code> acessa o valor do par (mapa de mapa): <code>it->first</code> é o sessionId, <code>it->second</code> é o <code>map&lt;string,string&gt;</code> de dados da sessão.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s8">
+  <div class="sec-head">
+    <span class="sec-num">08</span>
+    <span class="sec-title">CgiHandler — buildEnvp() e startCgi()</span>
+    <span class="sec-file">CgiHandler.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">static void</span> CgiHandler::<span class="name">buildEnvp</span>(<span class="kw">const</span> <span class="type">HttpRequest</span> &amp;<span class="param">req</span>, <span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">scriptFile</span>, <span class="type">std::vector</span>&lt;<span class="type">char*</span>&gt; &amp;<span class="param">envp</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">Por que envp é vector&lt;char*&gt; e não vector&lt;string&gt;</div>
+        <div class="func-text"><code>execve()</code> espera <code>char* argv[]</code> e <code>char* envp[]</code> — arrays de ponteiros para strings C terminadas em <code>\0</code>. <code>std::string</code> não é compatível diretamente. A solução é alocar cada variável de ambiente como um <code>char[]</code> com <code>new</code>, copiar o conteúdo com <code>strcpy</code>, e empurrar o ponteiro no vector. O vector termina com <code>NULL</code> — obrigatório para <code>execve()</code>.</div>
+      </div>
+      <div class="func-section">
+        <div class="func-label">O helper pushEnv</div>
+        <div class="func-text">Função estática livre que aloca o <code>char[]</code>, copia a string e empurra no vector. Retorna bool — se a alocação falhar (<code>new</code> retorna NULL em sistemas onde não lança exceção), retorna false e <code>buildEnvp</code> chama <code>freeEnvp()</code> para liberar tudo que foi alocado até ali.</div>
+      </div>
+      <div class="func-section">
+        <div class="func-label">Transformação dos headers HTTP em variáveis de ambiente</div>
+        <div class="func-text">Para cada header do request (exceto Content-Type, Content-Length, Transfer-Encoding que já têm variáveis específicas): prefixo <code>HTTP_</code> + nome do header em uppercase com traços (<code>-</code>) substituídos por underscores (<code>_</code>). Ex: header <code>X-Custom-Auth: valor</code> → env <code>HTTP_X_CUSTOM_AUTH=valor</code>. A transformação é feita caractere por caractere com aritmética de char: <code>c - 'a' + 'A'</code> converte minúscula para maiúscula.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">CgiHandler.cpp — transformação de header para env</div>
+        <pre><span class="type">std::string</span> <span class="var">envName</span> = <span class="str">"HTTP_"</span>;
+<span class="kw">for</span> (<span class="type">size_t</span> <span class="var">i</span> = <span class="num">0</span>; <span class="var">i</span> < key.<span class="fn">length</span>(); ++<span class="var">i</span>) {
+    <span class="type">char</span> <span class="var">c</span> = key[<span class="var">i</span>];
+    <span class="kw">if</span> (<span class="var">c</span> == <span class="str">'-'</span>)
+        <span class="var">envName</span> += <span class="str">'_'</span>;
+    <span class="kw">else if</span> (<span class="var">c</span> >= <span class="str">'a'</span> && <span class="var">c</span> <= <span class="str">'z'</span>)
+        <span class="var">envName</span> += (<span class="var">c</span> - <span class="str">'a'</span> + <span class="str">'A'</span>); <span class="cmt">// lowercase → uppercase: 'a'=97, 'A'=65, diff=32</span>
+    <span class="kw">else</span>
+        <span class="var">envName</span> += <span class="var">c</span>;
+}</pre>
+      </div>
+      <div class="box box-syntax">
+        <code>c - 'a' + 'A'</code> — aritmética de caracteres. Em ASCII, <code>'a'</code> = 97 e <code>'A'</code> = 65. A diferença é sempre 32. Subtrair <code>'a'</code> obtém a posição na letra do alfabeto (0-25), somar <code>'A'</code> chega na maiúscula correspondente. Mais eficiente que <code>toupper()</code> pois evita a chamada de função — e em C++98 <code>toupper()</code> tem comportamento definido por locale, o que pode ser problemático.
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="type">CgiProcess</span> CgiHandler::<span class="name">startCgi</span>(<span class="param">cgiPath</span>, <span class="param">scriptFile</span>, <span class="param">req</span>, <span class="param">loc</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">Sequência completa antes do fork</div>
+        <div class="func-text"><strong>1.</strong> Cria dois pipes: <code>pipeIn[2]</code> (servidor → CGI, stdin do CGI) e <code>pipeOut[2]</code> (CGI → servidor, stdout do CGI).<br>
+        <strong>2.</strong> Chama <code>buildEnvp()</code> para montar o array de ambiente.<br>
+        <strong>3.</strong> Cria o arquivo temporário com nome único: <code>/tmp/webserv_cgi_PID_TIME_COUNTER</code>. Usa um <code>static unsigned int tmpCounter</code> para garantir unicidade mesmo com múltiplos CGIs no mesmo segundo. Abre com <code>O_RDWR | O_CREAT | O_EXCL</code> — <code>O_EXCL</code> garante que falha se o arquivo já existir (proteção contra race condition).
+        </div>
+      </div>
+      <div class="func-section">
+        <div class="func-label">O processo filho (pid == 0)</div>
+        <div class="func-text">Fecha as pontas do pipe que não usa. <code>dup2(pipeIn[0], STDIN_FILENO)</code> — o stdin do filho passa a ser a ponta de leitura do pipeIn. <code>dup2(pipeOut[1], STDOUT_FILENO)</code> — o stdout do filho passa a ser a ponta de escrita do pipeOut. Fecha os fds originais (não precisam mais deles — estão duplicados). Chama <code>execve()</code> com o interpretador e o script. Se execve falhar → escreve "Status: 500\r\n\r\n" no stdout (que agora é o pipe) e chama <code>_exit(1)</code>.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">CgiHandler.cpp — startCgi() — processo filho</div>
+        <pre><span class="kw">if</span> (<span class="var">pid</span> == <span class="num">0</span>) {                        <span class="cmt">// FILHO</span>
+    <span class="fn">close</span>(<span class="var">pipeIn</span>[<span class="num">1</span>]);                   <span class="cmt">// fecha a ponta de escrita do pipeIn (é do pai)</span>
+    <span class="fn">close</span>(<span class="var">pipeOut</span>[<span class="num">0</span>]);                  <span class="cmt">// fecha a ponta de leitura do pipeOut (é do pai)</span>
+    <span class="fn">dup2</span>(<span class="var">pipeIn</span>[<span class="num">0</span>],  STDIN_FILENO);    <span class="cmt">// stdin = leitura do pipeIn</span>
+    <span class="fn">dup2</span>(<span class="var">pipeOut</span>[<span class="num">1</span>], STDOUT_FILENO);   <span class="cmt">// stdout = escrita do pipeOut</span>
+    <span class="fn">close</span>(<span class="var">pipeIn</span>[<span class="num">0</span>]);                   <span class="cmt">// fecha fd original (dup2 criou cópia)</span>
+    <span class="fn">close</span>(<span class="var">pipeOut</span>[<span class="num">1</span>]);
+    <span class="type">char</span> *<span class="var">argv</span>[] = { <span class="var">arg0</span>, <span class="var">arg1</span>, <span class="kw">NULL</span> }; <span class="cmt">// ["/usr/bin/python3", "script.py", NULL]</span>
+    <span class="fn">execve</span>(<span class="var">cgiPath</span>.<span class="fn">c_str</span>(), <span class="var">argv</span>, &amp;<span class="var">envp</span>[<span class="num">0</span>]);
+    <span class="fn">write</span>(STDOUT_FILENO, <span class="str">"Status: 500\r\n\r\n"</span>, <span class="num">15</span>); <span class="cmt">// execve falhou</span>
+    <span class="fn">_exit</span>(<span class="num">1</span>);                             <span class="cmt">// _exit: não chama destructors C++</span>
+}</pre>
+      </div>
+      <div class="func-section">
+        <div class="func-label">O processo pai — o que faz após o fork</div>
+        <div class="func-text">Fecha as pontas do pipe que são do filho (<code>pipeIn[0]</code>, <code>pipeOut[1]</code>). Libera o envp (<code>freeEnvp()</code>) — no filho o execve já substituiu o processo, no pai não é mais necessário. Seta pipeIn[1] e pipeOut[0] como non-blocking com <code>fcntl(fd, F_SETFL, O_NONBLOCK)</code>. Preenche e retorna a struct <code>CgiProcess</code> com valid=true.</div>
+      </div>
+      <div class="box box-syntax">
+        <strong><code>dup2(oldfd, newfd)</code></strong> — duplica <code>oldfd</code> para o número <code>newfd</code>. Se <code>newfd</code> já estava aberto, fecha-o primeiro. Após <code>dup2(pipeIn[0], STDIN_FILENO)</code>, tanto <code>pipeIn[0]</code> quanto <code>STDIN_FILENO(0)</code> apontam para a mesma ponta do pipe. O <code>close(pipeIn[0])</code> depois remove o fd original, deixando só o STDIN_FILENO — que é o que o execve usa.
+      </div>
+      <div class="box box-syntax">
+        <strong><code>_exit(1)</code> vs <code>exit(1)</code></strong> — <code>exit()</code> chama os destructors de objetos estáticos, flush dos buffers e handlers registrados com <code>atexit()</code>. No processo filho após fork, isso poderia fechar fds que o pai ainda usa ou dar flush duplo. <code>_exit()</code> termina imediatamente sem nada disso — é o correto em processos filhos após fork.
+      </div>
+      <div class="box box-syntax">
+        <strong><code>O_CREAT | O_EXCL</code></strong> — combinação que cria o arquivo e falha se já existir. Sem <code>O_EXCL</code>, <code>O_CREAT</code> silenciosamente abriria um arquivo existente. Com <code>O_EXCL</code>, é atômico: criação e verificação de unicidade numa única syscall, sem race condition.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s9">
+  <div class="sec-head">
+    <span class="sec-num">09</span>
+    <span class="sec-title">CgiHandler — finishCgi() e parseCgiHeaders()</span>
+    <span class="sec-file">CgiHandler.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="type">CgiResult</span> CgiHandler::<span class="name">finishCgi</span>(<span class="type">int</span> <span class="param">tmpFd</span>, <span class="kw">const</span> <span class="type">char*</span> <span class="param">tmpPath</span>, <span class="type">size_t</span> <span class="param">totalOutput</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">Recebe de quem / quando</div>
+        <div class="func-text">Chamada por <code>WebServ::finishCgi(clientFd)</code> quando o pipe de saída do CGI fecha (leitura retorna 0 ou negativo em <code>handleCgiRead()</code>). Recebe o fd do arquivo temporário (aberto para escrita), o path do mesmo arquivo e o total de bytes escritos nele.</div>
+      </div>
+      <div class="func-section">
+        <div class="func-label">Por que fecha e reabre o tmpFd</div>
+        <div class="func-text">O tmpFd foi aberto em modo <code>O_RDWR</code> e estava sendo usado para escrita (<code>write(tmpFd, ...)</code> em <code>handleCgiRead()</code>). O cursor de arquivo está no final. Para ler do início, seria possível usar <code>lseek(tmpFd, 0, SEEK_SET)</code>. O código opta por fechar e reabrir em <code>O_RDONLY</code> — mais explícito e sem ambiguidade sobre a posição do cursor.</div>
+      </div>
+      <div class="func-section">
+        <div class="func-label">Estratégia de leitura dos headers CGI</div>
+        <div class="func-text">Lê os primeiros 8192 bytes do arquivo em <code>headerBuf</code>. Busca <code>\r\n\r\n</code> (e fallback para <code>\n\n</code> porque alguns CGIs usam só <code>\n</code>). Esse separador divide os headers CGI do body. Chama <code>parseCgiHeaders()</code> para extrair Status e Content-Type. Calcula <code>bodyOffset</code> = posição após o separador. Calcula <code>bodySize</code> = totalOutput - bodyOffset.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">CgiHandler.cpp — finishCgi() — cálculo do offset</div>
+        <pre><span class="type">size_t</span> <span class="var">headerEnd</span> = headerChunk.<span class="fn">find</span>(<span class="str">"\r\n\r\n"</span>);
+<span class="type">size_t</span> <span class="var">headerSepLen</span> = <span class="num">4</span>;
+<span class="kw">if</span> (<span class="var">headerEnd</span> == <span class="type">std::string</span>::npos) {
+    <span class="var">headerEnd</span> = headerChunk.<span class="fn">find</span>(<span class="str">"\n\n"</span>);
+    <span class="var">headerSepLen</span> = <span class="num">2</span>;                   <span class="cmt">// CGI usa só \n (Unix puro)</span>
+}
+<span class="type">size_t</span> <span class="var">bodyOffset</span> = <span class="num">0</span>;
+<span class="kw">if</span> (<span class="var">headerEnd</span> != <span class="type">std::string</span>::npos) {
+    <span class="fn">parseCgiHeaders</span>(...);
+    <span class="var">bodyOffset</span> = <span class="var">headerEnd</span> + <span class="var">headerSepLen</span>; <span class="cmt">// início do body no arquivo</span>
+}
+<span class="var">result</span>.bodySize = totalOutput > <span class="var">bodyOffset</span> ? totalOutput - <span class="var">bodyOffset</span> : <span class="num">0</span>;
+<span class="var">result</span>.fileStartOffset = <span class="var">bodyOffset</span>; <span class="cmt">// o Client vai lseek para cá antes de ler</span>
+<span class="var">result</span>.useFile = <span class="kw">true</span>;
+<span class="var">result</span>.tmpFilePath = <span class="var">tmpPath</span>;</pre>
+      </div>
+      <div class="func-section">
+        <div class="func-label">O que o WebServ faz com o CgiResult</div>
+        <div class="func-text">Usa <code>result.statusCode</code> e <code>result.contentType</code> para chamar <code>client->setFileResponse(header, tmpFilePath, bodySize)</code> com <code>fileStartOffset</code>. O Client abre o tmpFile, faz <code>lseek(fd, fileStartOffset, SEEK_SET)</code> para pular os headers CGI e começa a ler o body a partir daí. O arquivo temporário é deletado no destrutor do Client com <code>unlink(tmpPath)</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">static void</span> <span class="name">parseCgiHeaders</span>(<span class="param">headerChunk</span>, <span class="param">headerEnd</span>, <span class="param">statusCode</span>, <span class="param">statusMessage</span>, <span class="param">contentType</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">O que parseia</div>
+        <div class="func-text">Extrai apenas dois campos dos headers CGI: <code>Status:</code> e <code>Content-Type:</code>. O <code>Status:</code> tem o formato <code>Status: 200 OK</code> — divide pelo primeiro espaço para separar code de message. Suporta CGIs que usam <code>\n</code> simples ou <code>\r\n</code> detectando qual separador de linha está presente. Se não encontrar <code>Status:</code>, mantém os defaults "200 OK". Antes de retornar, normaliza os três campos extraídos removendo qualquer <code>\r</code> ou <code>\n</code> residual do final do valor — proteção contra scripts CGI que não fecham os headers exatamente com a sequência de separador esperada.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">static void</span> CgiHandler::<span class="name">freeEnvp</span>(<span class="type">std::vector</span>&lt;<span class="type">char*</span>&gt; &amp;<span class="param">envp</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">Por que é necessário e como funciona</div>
+        <div class="func-text">Cada entrada do envp foi alocada com <code>new char[]</code>. Após o <code>execve()</code> no filho, o sistema libera toda a memória do processo. No pai, depois de chamar fork, o envp não é mais necessário — deve ser liberado. Se o fork falhar, deve ser liberado na hora. Se o buildEnvp falhar a meio, libera o que já foi alocado. Itera o vector e chama <code>delete[]</code> em cada ponteiro não-nulo, depois faz <code>clear()</code>.</div>
+      </div>
+      <div class="box box-warn">
+        O <code>NULL</code> que termina o envp é empurrado diretamente como <code>envp.push_back(NULL)</code> — não é alocado com new. Por isso o loop faz <code>if (envp[i])</code> antes de deletar — o NULL do final seria deletado de um endereço nulo, causando undefined behavior.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s10">
+  <div class="sec-head">
+    <span class="sec-num">10</span>
+    <span class="sec-title">Fluxo completo do módulo HTTP — do texto cru à resposta</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig"><span class="name">Caminho 1 — requisição estática (GET /index.html)</span></div>
+    <div class="func-body">
+      <div class="chain">
+        <span class="ch blue">recv() acumula buffer no Client</span>
+        <span class="arr">→</span>
+        <span class="ch">isRequestComplete() = true</span>
+        <span class="arr">→</span>
+        <span class="ch purple">new HttpRequest(buffer)</span>
+        <span class="arr">→</span>
+        <span class="ch">parseRequestLine() parseHeader() ×N</span>
+        <span class="arr">→</span>
+        <span class="ch red">generateResponse(req, srv, sessions)</span>
+        <span class="arr">→</span>
+        <span class="ch">location match "/" → GET → handleGet()</span>
+        <span class="arr">→</span>
+        <span class="ch">stat() S_ISREG → isFileResponse=true</span>
+        <span class="arr">→</span>
+        <span class="ch green">buildResponseString() = só o header</span>
+        <span class="arr">→</span>
+        <span class="ch blue">Client::setFileResponse() → envia em chunks</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig"><span class="name">Caminho 2 — requisição CGI (GET /cgi-bin/hello.py)</span></div>
+    <div class="func-body">
+      <div class="chain">
+        <span class="ch purple">new HttpRequest(buffer)</span>
+        <span class="arr">→</span>
+        <span class="ch red">generateResponse()</span>
+        <span class="arr">→</span>
+        <span class="ch">location /cgi-bin/ → cgi_ext .py bate</span>
+        <span class="arr">→</span>
+        <span class="ch yellow">needsCgi=true, retorna ""</span>
+        <span class="arr">→</span>
+        <span class="ch blue">WebServ detecta needsCgi</span>
+        <span class="arr">→</span>
+        <span class="ch">CgiHandler::startCgi()</span>
+        <span class="arr">→</span>
+        <span class="ch">buildEnvp() + fork() + dup2() + execve()</span>
+        <span class="arr">→</span>
+        <span class="ch">pipes entram no pollfds</span>
+        <span class="arr">→</span>
+        <span class="ch">handleCgiWrite() → write(body ao stdin)</span>
+        <span class="arr">→</span>
+        <span class="ch">handleCgiRead() → read(stdout) → write(tmp)</span>
+        <span class="arr">→</span>
+        <span class="ch">pipe fecha → CgiHandler::finishCgi()</span>
+        <span class="arr">→</span>
+        <span class="ch">parseCgiHeaders() → CgiResult</span>
+        <span class="arr">→</span>
+        <span class="ch green">client.setFileResponse(tmp) → POLLOUT → envia</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig"><span class="name">Caminho 3 — upload de arquivo (POST /uploads/)</span></div>
+    <div class="func-body">
+      <div class="chain">
+        <span class="ch purple">new HttpRequest(buffer)</span>
+        <span class="arr">→</span>
+        <span class="ch">isChunked? → decodeChunkedBody()</span>
+        <span class="arr">→</span>
+        <span class="ch red">generateResponse()</span>
+        <span class="arr">→</span>
+        <span class="ch">location /uploads/ → POST → handlePost()</span>
+        <span class="arr">→</span>
+        <span class="ch">parse multipart → extrai boundary</span>
+        <span class="arr">→</span>
+        <span class="ch">encontra \r\n\r\n do part → fileStart</span>
+        <span class="arr">→</span>
+        <span class="ch">encontra próximo boundary → fileEnd</span>
+        <span class="arr">→</span>
+        <span class="ch">ofstream.write() → arquivo salvo</span>
+        <span class="arr">→</span>
+        <span class="ch green">201 Created</span>
+      </div>
+    </div>
+  </div>
+
+  <table class="detail">
+    <thead><tr><th>Atributo HttpResponse</th><th>Setado onde</th><th>Usado onde</th></tr></thead>
+    <tbody>
+      <tr><td>statusCode / statusMessage</td><td>generateResponse(), handleGet/Post/Delete, setErrorResponse()</td><td>buildResponseHeader()</td></tr>
+      <tr><td>body</td><td>handleGet (autoindex), handlePost, setErrorResponse(), sessões</td><td>buildResponseString() — concatenado após header</td></tr>
+      <tr><td>contentType</td><td>handleGet (por extensão), setErrorResponse()</td><td>buildResponseHeader()</td></tr>
+      <tr><td>isFileResponse</td><td>handleGet (arquivo regular)</td><td>buildResponseString() — retorna só header; Client lê o arquivo</td></tr>
+      <tr><td>filePath / fileSize</td><td>handleGet</td><td>Client::setFileResponse() para servir em chunks</td></tr>
+      <tr><td>needsCgi / cgiScriptPath / cgiExecPath</td><td>generateResponse() — detecção de extensão</td><td>WebServ::handleClientRead() → CgiHandler::startCgi()</td></tr>
+      <tr><td>redirectUrl</td><td>generateResponse() — location com redirect</td><td>buildResponseHeader() — header Location:</td></tr>
+      <tr><td>cookies</td><td>addCookie() — no bloco de sessão</td><td>buildResponseHeader() — Set-Cookie: ×N</td></tr>
+    </tbody>
+  </table>
+
+</div>
+
+</div><!-- /page -->
+</body>
+</html>

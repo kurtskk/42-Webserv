@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Módulo Config — Guia Profundo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg: #fafaf8;
+  --bg2: #f3f2ee;
+  --bg3: #eae9e3;
+  --border: #d8d6ce;
+  --border2: #c8c5bb;
+  --ink: #1a1917;
+  --ink2: #3d3b36;
+  --ink3: #6b6860;
+  --accent: #c4522a;
+  --accent2: #2a6bc4;
+  --accent3: #2a8c4e;
+  --accent4: #7a2ac4;
+  --yellow-bg: #fef9e7;
+  --yellow-border: #e8d88a;
+  --blue-bg: #e8f0fe;
+  --blue-border: #a8c0f0;
+  --green-bg: #e8f5ee;
+  --green-border: #a0d0b0;
+  --red-bg: #fde8e4;
+  --red-border: #f0b0a0;
+  --purple-bg: #f0e8fe;
+  --purple-border: #c8a8f0;
+  --mono: 'Inconsolata', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.7; }
+
+/* ── HEADER ── */
+.header {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 2.5rem 2rem;
+}
+.header-inner { max-width: 820px; margin: 0 auto; }
+.header-tag {
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .15em;
+  color: #888;
+  text-transform: uppercase;
+  margin-bottom: .5rem;
+}
+.header h1 {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  margin-bottom: .6rem;
+}
+.header h1 span { color: var(--accent); }
+.header-desc { font-size: .9rem; color: #aaa; max-width: 480px; }
+.header-files {
+  display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem;
+}
+.hf {
+  font-family: var(--mono); font-size: .72rem;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+  border-radius: 3px; padding: .2rem .6rem; color: #ccc;
+}
+
+/* ── NAV ── */
+.nav {
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: .6rem 1.5rem; position: sticky; top: 0; z-index: 100;
+  overflow-x: auto; white-space: nowrap;
+}
+.nav a {
+  font-family: var(--mono); font-size: .7rem; color: var(--ink3);
+  text-decoration: none; margin-right: 1.2rem; letter-spacing: .03em;
+  transition: color .15s;
+}
+.nav a:hover { color: var(--accent); }
+
+/* ── PAGE ── */
+.page { max-width: 820px; margin: 0 auto; padding: 2rem 1.2rem 5rem; }
+
+/* ── SECTION ── */
+.section { margin-top: 3rem; }
+.sec-head {
+  display: flex; align-items: baseline; gap: .8rem;
+  margin-bottom: 1.4rem; padding-bottom: .6rem;
+  border-bottom: 2px solid var(--ink);
+}
+.sec-num {
+  font-family: var(--mono); font-size: .65rem; font-weight: 700;
+  background: var(--ink); color: var(--bg);
+  padding: .18rem .45rem; border-radius: 2px; letter-spacing: .06em;
+}
+.sec-title { font-size: 1.15rem; font-weight: 700; color: var(--ink); }
+.sec-file { font-family: var(--mono); font-size: .72rem; color: var(--accent2); margin-left: auto; }
+
+/* ── FUNC BLOCK ── */
+.func {
+  border: 1px solid var(--border); border-radius: 6px;
+  margin-bottom: 1.2rem; overflow: hidden;
+}
+.func-sig {
+  background: var(--ink); padding: .7rem 1rem;
+  font-family: var(--mono); font-size: .8rem; color: #e0d8c8;
+  letter-spacing: .01em; line-height: 1.5;
+}
+.func-sig .ret { color: #f4a261; }
+.func-sig .name { color: #90e0a8; font-weight: 600; }
+.func-sig .param { color: #a8c8f8; }
+.func-sig .kw { color: #c084fc; }
+
+.func-body { padding: .9rem 1rem; background: var(--bg); }
+.func-section { margin-bottom: .9rem; }
+.func-section:last-child { margin-bottom: 0; }
+.func-label {
+  font-family: var(--mono); font-size: .62rem; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink3); margin-bottom: .35rem;
+  display: flex; align-items: center; gap: .4rem;
+}
+.func-label::before { content: ''; display: block; width: 16px; height: 1px; background: var(--border2); }
+.func-text { font-size: .88rem; color: var(--ink2); line-height: 1.72; }
+
+/* ── CODE BLOCK ── */
+.code-block {
+  background: #1a1917; border-radius: 5px;
+  margin: .6rem 0; overflow: hidden;
+}
+.code-file {
+  background: #252420; padding: .3rem .8rem;
+  font-family: var(--mono); font-size: .62rem; color: #888;
+  border-bottom: 1px solid #333;
+}
+pre {
+  padding: .75rem 1rem;
+  font-family: var(--mono); font-size: .78rem;
+  color: #d0cfc8; line-height: 1.65;
+  overflow-x: auto; white-space: pre;
+}
+.kw { color: #c084fc; }
+.str { color: #a8c870; }
+.num { color: #f4a261; }
+.cmt { color: #666; font-style: italic; }
+.fn { color: #90e0a8; }
+.type { color: #60c8f8; }
+.var { color: #f8c060; }
+
+/* ── CALLOUT BOXES ── */
+.box {
+  border-radius: 5px; padding: .75rem 1rem;
+  margin: .6rem 0; font-size: .86rem; line-height: 1.7;
+}
+.box-why { background: var(--yellow-bg); border: 1px solid var(--yellow-border); }
+.box-why::before { content: '💡 Por que assim: '; font-weight: 700; color: #b8900a; }
+.box-warn { background: var(--red-bg); border: 1px solid var(--red-border); }
+.box-warn::before { content: '⚠ Atenção: '; font-weight: 700; color: var(--accent); }
+.box-note { background: var(--blue-bg); border: 1px solid var(--blue-border); }
+.box-note::before { content: '📌 Nota: '; font-weight: 700; color: var(--accent2); }
+.box-flow { background: var(--green-bg); border: 1px solid var(--green-border); }
+.box-flow::before { content: '→ Fluxo: '; font-weight: 700; color: var(--accent3); }
+.box-syntax { background: var(--purple-bg); border: 1px solid var(--purple-border); }
+.box-syntax::before { content: '🔬 Sintaxe C++98: '; font-weight: 700; color: var(--accent4); }
+
+/* ── FLOW CHAIN ── */
+.chain {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .3rem;
+  padding: .6rem 0; margin: .4rem 0;
+}
+.ch { 
+  font-family: var(--mono); font-size: .72rem;
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 3px; padding: .2rem .55rem; color: var(--ink2);
+}
+.ch.green { background: var(--green-bg); border-color: var(--green-border); color: var(--accent3); }
+.ch.blue { background: var(--blue-bg); border-color: var(--blue-border); color: var(--accent2); }
+.ch.red { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+.ch.yellow { background: var(--yellow-bg); border-color: var(--yellow-border); color: #8a6500; }
+.ch.purple { background: var(--purple-bg); border-color: var(--purple-border); color: var(--accent4); }
+.arr { color: var(--ink3); font-size: .8rem; }
+
+/* ── TABLE ── */
+table.detail {
+  width: 100%; border-collapse: collapse;
+  font-size: .82rem; margin: .6rem 0;
+}
+table.detail th {
+  background: var(--bg3); padding: .45rem .8rem;
+  text-align: left; font-family: var(--mono); font-size: .65rem;
+  color: var(--ink3); border-bottom: 2px solid var(--border2);
+  letter-spacing: .06em; text-transform: uppercase;
+}
+table.detail td {
+  padding: .45rem .8rem; border-bottom: 1px solid var(--border);
+  vertical-align: top; color: var(--ink2);
+}
+table.detail tr:last-child td { border-bottom: none; }
+table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color: var(--accent2); font-weight: 600; }
+
+/* ── OVERVIEW BOX ── */
+.overview {
+  background: var(--ink); color: #e0d8c8;
+  border-radius: 6px; padding: 1.2rem 1.4rem; margin-bottom: 2rem;
+}
+.overview h2 { font-size: .95rem; color: #90e0a8; margin-bottom: .6rem; font-family: var(--mono); }
+.overview p { font-size: .88rem; line-height: 1.75; color: #c0b8a8; }
+.overview p + p { margin-top: .5rem; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="header-tag">Módulo 01 · Webserv</div>
+    <h1>Módulo <span>Config</span></h1>
+    <p class="header-desc">Guia profundo — cada função, cada decisão técnica, cada sintaxe C++98, fluxo completo de entrada e saída.</p>
+    <div class="header-files">
+      <span class="hf">Config.hpp</span>
+      <span class="hf">Config.cpp</span>
+      <span class="hf">ServerConfig.hpp</span>
+      <span class="hf">ServerConfig.cpp</span>
+      <span class="hf">LocationConfig.hpp</span>
+      <span class="hf">LocationConfig.cpp</span>
+    </div>
+  </div>
+</div>
+
+<nav class="nav">
+  <a href="#s0">Visão Geral</a>
+  <a href="#s1">Config::load</a>
+  <a href="#s2">parseServerBlock</a>
+  <a href="#s3">parseLocationBlock</a>
+  <a href="#s4">Helpers de Parse</a>
+  <a href="#s5">ServerConfig</a>
+  <a href="#s6">LocationConfig</a>
+  <a href="#s7">Hierarquia de dados</a>
+</nav>
+
+<div class="page">
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s0">
+  <div class="overview">
+    <h2>// O que este módulo faz e por que existe</h2>
+    <p>O módulo Config é o <strong>primeiro a rodar</strong> no servidor — antes de qualquer socket, qualquer conexão. Ele lê o arquivo de texto <code>webserv.conf</code> e transforma esse texto em objetos C++ que o resto do servidor usa para tomar decisões.</p>
+    <p>Resultado final: um <code>std::vector&lt;ServerConfig&gt;</code> onde cada <code>ServerConfig</code> contém uma porta, um server_name, regras de erro e um vetor de <code>LocationConfig</code> com as rotas. Tudo isso é passado para o <code>WebServ</code> que lê essas estruturas durante toda a vida do servidor.</p>
+    <p>O módulo tem <strong>3 classes</strong>: <code>Config</code> (lê e valida o arquivo), <code>ServerConfig</code> (representa um bloco <code>server {}</code>), <code>LocationConfig</code> (representa um bloco <code>location {}</code>).</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s1">
+  <div class="sec-head">
+    <span class="sec-num">01</span>
+    <span class="sec-title">Config::load() — ponto de entrada do módulo</span>
+    <span class="sec-file">Config.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> Config::<span class="name">load</span>(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">filename</span>)
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">Recebe de quem / quando</div>
+        <div class="func-text">Chamada diretamente pelo <code>main()</code> logo depois de criar o objeto Config: <code>config.load(argv[1])</code>. Recebe o caminho do arquivo de configuração como string. É a única função pública de leitura do módulo — todo o resto é privado.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">O que faz — passo a passo</div>
+        <div class="func-text">
+          <strong>1.</strong> Abre o arquivo com <code>std::ifstream</code>. Se falhar → lança <code>std::runtime_error</code>. Esse erro é capturado pelo <code>try/catch</code> no <code>main()</code>.<br><br>
+          <strong>2.</strong> Lê linha por linha com <code>std::getline</code>. Para cada linha: remove comentários (<code>stripComment</code>), quebra em tokens (<code>tokenize</code>), ignora linhas vazias.<br><br>
+          <strong>3.</strong> Espera encontrar exatamente <code>server {</code> como dois tokens. Se encontrar → chama <code>parseServerBlock()</code> que consome as linhas seguintes até o <code>}</code> correspondente e preenche um <code>ServerConfig</code>. Empurra o <code>ServerConfig</code> preenchido para <code>servers</code>.<br><br>
+          <strong>4.</strong> Se encontrar qualquer coisa que não seja <code>server {</code> no nível raiz → lança exceção. Não há flexibilidade — o formato é exato.
+        </div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">O que retorna / para quem</div>
+        <div class="func-text">Retorna void. O resultado fica em <code>servers</code> (atributo privado). O <code>main()</code> acessa via <code>config.getServers()</code> — que retorna <code>const std::vector&lt;ServerConfig&gt; &amp;</code> — e passa para o construtor do <code>WebServ</code>.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">Config.cpp — Config::load()</div>
+        <pre><span class="type">std::ifstream</span> <span class="var">file</span>(filename.<span class="fn">c_str</span>());  <span class="cmt">// c_str() porque é C++98 — ifstream não aceita std::string diretamente</span>
+<span class="kw">if</span> (!file.<span class="fn">is_open</span>())
+    <span class="kw">throw</span> <span class="type">std::runtime_error</span>(<span class="str">"Could not open config file: "</span> + filename);
+
+<span class="type">std::string</span> <span class="var">line</span>;
+<span class="kw">while</span> (<span class="type">std::getline</span>(<span class="var">file</span>, <span class="var">line</span>)) {     <span class="cmt">// lê linha por linha até EOF</span>
+    <span class="fn">stripComment</span>(<span class="var">line</span>);               <span class="cmt">// remove tudo após '#'</span>
+    <span class="type">std::vector</span>&lt;<span class="type">std::string</span>&gt; <span class="var">tokens</span> = <span class="fn">tokenize</span>(<span class="var">line</span>);
+    <span class="kw">if</span> (<span class="var">tokens</span>.<span class="fn">empty</span>()) <span class="kw">continue</span>;   <span class="cmt">// linha em branco ou só comentário</span>
+    <span class="kw">if</span> (<span class="var">tokens</span>[<span class="num">0</span>] == <span class="str">"server"</span> &amp;&amp; <span class="var">tokens</span>.<span class="fn">size</span>() == <span class="num">2</span> &amp;&amp; <span class="var">tokens</span>[<span class="num">1</span>] == <span class="str">"{"</span>) {
+        <span class="type">ServerConfig</span> <span class="var">server</span>;             <span class="cmt">// criado na stack, copiado depois</span>
+        <span class="fn">parseServerBlock</span>(<span class="var">file</span>, <span class="var">server</span>); <span class="cmt">// consome linhas até o '}' do server</span>
+        <span class="var">servers</span>.<span class="fn">push_back</span>(<span class="var">server</span>);
+    }
+    <span class="kw">else</span>
+        <span class="kw">throw</span> <span class="type">std::runtime_error</span>(<span class="str">"Invalid config file format..."</span>);
+}</pre>
+      </div>
+
+      <div class="box box-syntax">
+        <code>std::ifstream file(filename.c_str())</code> — em C++98, o construtor de <code>ifstream</code> aceita apenas <code>const char*</code>, não <code>std::string</code>. Por isso o <code>.c_str()</code> que converte a string para ponteiro C. Em C++11 isso seria desnecessário.
+      </div>
+
+      <div class="box box-syntax">
+        <code>std::getline(file, line)</code> — retorna uma referência ao stream. Em contexto booleano (dentro do while), o stream é convertido para bool: <code>true</code> se a leitura funcionou, <code>false</code> se chegou ao EOF ou ocorreu erro. É o idioma padrão C++ para ler linha por linha.
+      </div>
+
+      <div class="box box-why">
+        O arquivo é lido linha por linha em vez de carregado inteiro na memória porque o arquivo de configuração pode ser grande. Também porque processar linha por linha permite detectar erros de formato exatamente onde ocorrem — sabemos em qual linha o problema está.
+      </div>
+
+    </div>
+  </div>
+
+  <!-- stripComment -->
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> Config::<span class="name">stripComment</span>(<span class="type">std::string</span> &amp;<span class="param">line</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">O que faz</div>
+        <div class="func-text">Encontra o primeiro <code>#</code> na linha e apaga tudo a partir daí com <code>erase(pos)</code>. Modifica a string <strong>in-place</strong> (por referência).</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">Config.cpp — stripComment()</div>
+        <pre><span class="type">size_t</span> <span class="var">pos</span> = line.<span class="fn">find</span>(<span class="str">'#'</span>);
+<span class="kw">if</span> (<span class="var">pos</span> != <span class="type">std::string</span>::npos)   <span class="cmt">// npos = "não encontrado" = maior size_t possível</span>
+    line.<span class="fn">erase</span>(<span class="var">pos</span>);              <span class="cmt">// erase(pos) sem segundo arg apaga até o fim</span></pre>
+      </div>
+      <div class="box box-syntax">
+        <code>std::string::npos</code> é uma constante estática do tipo <code>size_t</code> com valor máximo (normalmente <code>-1</code> em aritmética sem sinal, que é o maior valor possível). <code>find()</code> retorna <code>npos</code> quando não encontra. <code>erase(pos)</code> sem segundo argumento apaga da posição <code>pos</code> até o fim — equivalente a <code>erase(pos, string::npos)</code>.
+      </div>
+      <div class="box box-why">
+        Passagem por referência (<code>std::string &amp;</code>) evita copiar a string. A função modifica diretamente o objeto que foi passado. Se fosse <code>const std::string &amp;</code> não poderia modificar — sem o const, pode.
+      </div>
+    </div>
+  </div>
+
+  <!-- tokenize -->
+  <div class="func">
+    <div class="func-sig">
+      <span class="type">std::vector</span>&lt;<span class="type">std::string</span>&gt; Config::<span class="name">tokenize</span>(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">line</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">O que faz</div>
+        <div class="func-text">Quebra a linha em palavras separadas por qualquer whitespace (espaço, tab, múltiplos espaços). Retorna um <code>vector&lt;string&gt;</code> com as palavras.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">Config.cpp — tokenize()</div>
+        <pre><span class="type">std::vector</span>&lt;<span class="type">std::string</span>&gt; <span class="var">tokens</span>;
+<span class="type">std::string</span> <span class="var">token</span>;
+<span class="type">std::istringstream</span> <span class="var">tokenStream</span>(<span class="var">line</span>);   <span class="cmt">// trata a string como um stream</span>
+<span class="kw">while</span> (<span class="var">tokenStream</span> >> <span class="var">token</span>) {           <span class="cmt">// >> pula whitespace, lê até próximo whitespace</span>
+    <span class="var">tokens</span>.<span class="fn">push_back</span>(<span class="var">token</span>);
+}
+<span class="kw">return</span> (<span class="var">tokens</span>);</pre>
+      </div>
+      <div class="box box-syntax">
+        <code>std::istringstream</code> é um stream que lê de uma string em vez de um arquivo. O operador <code>&gt;&gt;</code> num stream de string funciona igual ao <code>cin &gt;&gt;</code>: pula whitespace no início, lê até o próximo whitespace. Isso faz com que múltiplos espaços/tabs entre tokens sejam tratados como um único separador automaticamente.
+      </div>
+      <div class="box box-note">
+        Resultado para a linha <code>"  location  /uploads/  {  "</code>: <code>tokens[0]="location"</code>, <code>tokens[1]="/uploads/"</code>, <code>tokens[2]="{"</code>. Espaços extras e tabs são ignorados automaticamente.
+      </div>
+      <div class="box box-why">
+        Usar <code>istringstream</code> + <code>&gt;&gt;</code> é o idioma mais idiomático em C++ para split por whitespace. A alternativa seria iterar caractere por caractere — muito mais verboso. A desvantagem é que não preserva ordem de múltiplas palavras em valores (mas nenhum valor no conf precisa disso).
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s2">
+  <div class="sec-head">
+    <span class="sec-num">02</span>
+    <span class="sec-title">Config::parseServerBlock() — lê um bloco server {}</span>
+    <span class="sec-file">Config.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> Config::<span class="name">parseServerBlock</span>(<span class="type">std::ifstream</span> &amp;<span class="param">file</span>, <span class="type">ServerConfig</span> &amp;<span class="param">server</span>)
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">Recebe de quem</div>
+        <div class="func-text">Chamada por <code>load()</code> quando encontra <code>server {</code>. Recebe o <strong>mesmo ifstream</strong> que o load está usando — o cursor de leitura do arquivo já está na linha após o <code>server {</code>. Recebe também uma referência para o <code>ServerConfig</code> que deve preencher.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Por que o ifstream é passado por referência</div>
+        <div class="func-text">O <code>ifstream</code> representa a posição atual de leitura no arquivo. Se fosse passado por cópia, a função leria do início do arquivo. Passando por referência, <code>parseServerBlock</code> continua do ponto onde <code>load()</code> parou — esse é o mecanismo que permite parsear blocos aninhados sequencialmente.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Como funciona — o loop de leitura</div>
+        <div class="func-text">Mesmo padrão de <code>load()</code>: getline → stripComment → tokenize → testa o primeiro token. A diferença: quando encontra <code>}</code> faz <code>return</code> imediatamente. Quando encontra <code>location /path {</code>, cria um <code>LocationConfig(tokens[1])</code>, chama <code>parseLocationBlock(file, location)</code> — passando o mesmo stream — e depois faz <code>server.addLocation(location)</code>.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">E se o bloco não fechar?</div>
+        <div class="func-text">O <code>while(getline)</code> termina quando chega no EOF sem ter encontrado o <code>}</code>. Depois do while há sempre um <code>throw runtime_error("Server block not closed properly")</code>. O <code>return</code> só acontece dentro do loop quando encontra o <code>}</code> — o throw após o loop é o tratamento de erro de bloco não fechado.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">Config.cpp — parseServerBlock() — estrutura principal</div>
+        <pre><span class="kw">while</span> (<span class="type">std::getline</span>(<span class="var">file</span>, <span class="var">line</span>)) {
+    <span class="cmt">// ... stripComment, tokenize, skip empty ...</span>
+
+    <span class="kw">if</span> (<span class="var">tokens</span>[<span class="num">0</span>] == <span class="str">"}"</span>)
+        <span class="kw">return</span>;                          <span class="cmt">// fim do bloco server — retorno normal</span>
+
+    <span class="kw">else if</span> (<span class="var">tokens</span>[<span class="num">0</span>] == <span class="str">"listen"</span> &amp;&amp; <span class="var">tokens</span>.<span class="fn">size</span>() == <span class="num">2</span>) {
+        <span class="type">int</span> <span class="var">port</span> = <span class="fn">parsePort</span>(<span class="var">tokens</span>[<span class="num">1</span>]);   <span class="cmt">// valida e converte</span>
+        <span class="var">server</span>.<span class="fn">setListenPort</span>(<span class="var">port</span>);
+    }
+    <span class="kw">else if</span> (<span class="var">tokens</span>[<span class="num">0</span>] == <span class="str">"location"</span> &amp;&amp; <span class="var">tokens</span>.<span class="fn">size</span>() == <span class="num">3</span> &amp;&amp; <span class="var">tokens</span>[<span class="num">2</span>] == <span class="str">"{"</span>) {
+        <span class="type">LocationConfig</span> <span class="var">location</span>(<span class="var">tokens</span>[<span class="num">1</span>]); <span class="cmt">// tokens[1] = o path "/uploads/"</span>
+        <span class="fn">parseLocationBlock</span>(<span class="var">file</span>, <span class="var">location</span>); <span class="cmt">// passa o MESMO stream</span>
+        <span class="var">server</span>.<span class="fn">addLocation</span>(<span class="var">location</span>);      <span class="cmt">// cópia do LocationConfig vai para o vector</span>
+    }
+    <span class="cmt">// ... outros campos: server_name, root, index, error_page, client_max_body_size ...</span>
+}
+<span class="kw">throw</span> <span class="type">std::runtime_error</span>(<span class="str">"Server block not closed properly"</span>); <span class="cmt">// só chega aqui se EOF sem '}'</span></pre>
+      </div>
+
+      <div class="box box-note">
+        <strong>Ordem de verificação dos tokens:</strong> sempre checa <code>tokens[0]</code> (a diretiva) e <code>tokens.size()</code> (número de argumentos) juntos. Ex: <code>tokens[0] == "listen" &amp;&amp; tokens.size() == 2</code> garante que existe exatamente um argumento após o <code>listen</code>. Se tiver mais ou menos tokens, a linha é ignorada silenciosamente (cai no else implícito — não há tratamento de campo desconhecido).
+      </div>
+
+      <div class="box box-flow">
+        <strong>Fluxo do cursor do arquivo durante o parse de dois servers:</strong><br>
+        load() lê "server {" → chama parseServerBlock(file) → parseServerBlock lê linhas do servidor 1 → encontra "}" → retorna → load() volta ao while → lê "server {" do servidor 2 → chama parseServerBlock novamente → e assim por diante.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s3">
+  <div class="sec-head">
+    <span class="sec-num">03</span>
+    <span class="sec-title">Config::parseLocationBlock() — lê um bloco location {}</span>
+    <span class="sec-file">Config.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">void</span> Config::<span class="name">parseLocationBlock</span>(<span class="type">std::ifstream</span> &amp;<span class="param">file</span>, <span class="type">LocationConfig</span> &amp;<span class="param">location</span>)
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">Estrutura idêntica ao parseServerBlock</div>
+        <div class="func-text">Mesmo padrão: loop getline, stripComment, tokenize. Retorna quando encontra <code>}</code>. Lança exceção se chega ao EOF sem fechar. A diferença é o conjunto de diretivas que reconhece — são as diretivas de location: root, index, autoindex, allow_methods, cgi_ext, cgi_path, client_max_body_size, upload_store, return.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Diretiva allow_methods — múltiplos valores</div>
+        <div class="func-text">É a única diretiva com número variável de tokens. Em vez de checar <code>tokens.size() == N</code>, itera a partir do índice 1 e chama <code>location.addAllowedMethod(tokens[i])</code> para cada token. Isso permite <code>allow_methods GET POST DELETE</code> ou só <code>allow_methods GET</code>.</div>
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Diretiva return — o redirect</div>
+        <div class="func-text">A mais complexa: <code>return 302 https://www.google.com</code>. O código é lido como string (<code>tokens[1]</code>) e convertido para int via <code>istringstream</code>. A lógica usa o truque <code>iss &gt;&gt; code</code> + <code>iss.get(extra)</code> para garantir que a string é um número puro — sem letras após os dígitos.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">Config.cpp — parseLocationBlock() — trecho allow_methods e return</div>
+        <pre><span class="cmt">// allow_methods aceita 1 ou mais métodos</span>
+<span class="kw">else if</span> (<span class="var">tokens</span>[<span class="num">0</span>] == <span class="str">"allow_methods"</span>) {
+    <span class="kw">for</span> (<span class="type">size_t</span> <span class="var">i</span> = <span class="num">1</span>; <span class="var">i</span> &lt; <span class="var">tokens</span>.<span class="fn">size</span>(); ++<span class="var">i</span>)
+        <span class="var">location</span>.<span class="fn">addAllowedMethod</span>(<span class="var">tokens</span>[<span class="var">i</span>]);
+}
+
+<span class="cmt">// return 302 https://... — parse do código numérico</span>
+<span class="kw">else if</span> (<span class="var">tokens</span>[<span class="num">0</span>] == <span class="str">"return"</span> &amp;&amp; <span class="var">tokens</span>.<span class="fn">size</span>() == <span class="num">3</span>) {
+    <span class="type">std::istringstream</span> <span class="var">issCode</span>(<span class="var">tokens</span>[<span class="num">1</span>]);
+    <span class="type">int</span> <span class="var">code</span>;
+    <span class="type">char</span> <span class="var">extra</span>;
+    <span class="kw">if</span> (!(issCode >> <span class="var">code</span>) || issCode.<span class="fn">get</span>(<span class="var">extra</span>))  <span class="cmt">// ver explicação abaixo</span>
+        <span class="kw">throw</span> <span class="type">std::runtime_error</span>(<span class="str">"Invalid redirect code: '"</span> + <span class="var">tokens</span>[<span class="num">1</span>] + <span class="str">"'"</span>);
+    <span class="var">location</span>.<span class="fn">setRedirectCode</span>(<span class="var">code</span>);
+    <span class="var">location</span>.<span class="fn">setRedirectUrl</span>(<span class="var">tokens</span>[<span class="num">2</span>]);
+}</pre>
+      </div>
+
+      <div class="box box-syntax">
+        <strong>O padrão <code>iss &gt;&gt; code</code> + <code>iss.get(extra)</code>:</strong><br><br>
+        <code>iss &gt;&gt; code</code> — tenta ler um int. Se a string começa com letras ou está vazia, falha → a condição <code>!(iss &gt;&gt; code)</code> é true → lança exceção. Isso detecta <code>"abc"</code>, <code>""</code>, <code>"3x2"</code> parcialmente — mas "3x2" seria lido como 3 com sucesso aqui.<br><br>
+        <code>iss.get(extra)</code> — tenta ler mais um caractere após o número. Se conseguir (retorna true), significa que havia algo após os dígitos — <code>"302abc"</code> seria inválido. Se não conseguir (stream no EOF), a string era um número puro. A condição <code>|| iss.get(extra)</code> captura esse caso.
+      </div>
+
+      <div class="box box-warn">
+        Este padrão de validação (iss &gt;&gt; val + iss.get(extra)) aparece em <strong>três lugares</strong> no módulo: <code>parsePort</code>, <code>parseErrorCode</code> e aqui no return. É o idioma padrão C++98 para "converta e garanta que a string inteira é um número".
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s4">
+  <div class="sec-head">
+    <span class="sec-num">04</span>
+    <span class="sec-title">Funções Helper de Parse e Validação</span>
+    <span class="sec-file">Config.cpp — funções estáticas e privadas</span>
+  </div>
+
+  <!-- parsePort -->
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">static int</span> Config::<span class="name">parsePort</span>(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">value</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">O que valida</div>
+        <div class="func-text">Converte string para int, verifica que não há caracteres extras (padrão iss+get(extra)), e verifica que está no range 1–65535. TCP tem portas de 0 a 65535 — porta 0 é reservada para o sistema.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">Config.cpp — parsePort()</div>
+        <pre><span class="type">std::istringstream</span> <span class="var">iss</span>(<span class="var">value</span>);
+<span class="type">int</span> <span class="var">port</span>;
+<span class="type">char</span> <span class="var">extra</span>;
+<span class="kw">if</span> (!(iss >> <span class="var">port</span>) || iss.<span class="fn">get</span>(<span class="var">extra</span>))          <span class="cmt">// não é número puro</span>
+    <span class="kw">throw</span> <span class="type">std::runtime_error</span>(<span class="str">"Invalid port: '"</span> + <span class="var">value</span> + <span class="str">"' is not a valid number"</span>);
+<span class="kw">if</span> (<span class="var">port</span> &lt; <span class="num">1</span> || <span class="var">port</span> &gt; <span class="num">65535</span>)                  <span class="cmt">// range TCP válido</span>
+    <span class="kw">throw</span> <span class="type">std::runtime_error</span>(<span class="str">"Invalid port: "</span> + <span class="var">value</span> + <span class="str">" out of range (1-65535)"</span>);
+<span class="kw">return</span> (<span class="var">port</span>);</pre>
+      </div>
+      <div class="box box-note">
+        É <code>static</code> porque não precisa acessar atributos da instância — opera só sobre o argumento. Em C++, funções membro estáticas não recebem o ponteiro <code>this</code> implicitamente. Isso também permite chamá-la sem um objeto: <code>Config::parsePort("8080")</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- parseBodySize -->
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">static size_t</span> Config::<span class="name">parseBodySize</span>(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="param">value</span>)
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">O que faz — suporte a sufixos K/M/G/T</div>
+        <div class="func-text">Aceita valores como <code>100</code>, <code>200M</code>, <code>1G</code>. Itera manualmente sobre os caracteres para separar a parte numérica da parte de sufixo — porque <code>istringstream</code> pararia nos dígitos sem consumir o sufixo.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">Config.cpp — parseBodySize() — algoritmo</div>
+        <pre><span class="type">size_t</span> <span class="var">i</span> = <span class="num">0</span>;
+<span class="kw">while</span> (<span class="var">i</span> &lt; value.<span class="fn">length</span>() &amp;&amp; <span class="type">std::isdigit</span>(value[<span class="var">i</span>]))
+    <span class="var">i</span>++;                              <span class="cmt">// avança enquanto for dígito</span>
+
+<span class="type">std::string</span> <span class="var">numStr</span> = value.<span class="fn">substr</span>(<span class="num">0</span>, <span class="var">i</span>);   <span class="cmt">// parte numérica: "200"</span>
+<span class="type">std::string</span> <span class="var">suffix</span> = value.<span class="fn">substr</span>(<span class="var">i</span>);     <span class="cmt">// sufixo: "M" ou ""</span>
+
+<span class="cmt">// suffix não pode ter mais de 1 caractere</span>
+<span class="kw">if</span> (suffix.<span class="fn">length</span>() > <span class="num">1</span>)
+    <span class="kw">throw</span> <span class="type">std::runtime_error</span>(<span class="str">"Invalid body size: invalid suffix"</span>);
+
+<span class="cmt">// converte parte numérica</span>
+<span class="type">std::istringstream</span> <span class="var">issNum</span>(<span class="var">numStr</span>);
+<span class="type">unsigned long</span> <span class="var">num</span>;
+<span class="kw">if</span> (!(issNum >> <span class="var">num</span>)) <span class="kw">throw</span> ...;
+
+<span class="cmt">// aplica multiplicador via switch</span>
+<span class="type">size_t</span> <span class="var">multiplier</span> = <span class="num">1</span>;
+<span class="kw">switch</span> (suffix[<span class="num">0</span>]) {
+    <span class="kw">case</span> <span class="str">'k'</span>: <span class="kw">case</span> <span class="str">'K'</span>: <span class="var">multiplier</span> = <span class="num">1024</span>; <span class="kw">break</span>;
+    <span class="kw">case</span> <span class="str">'m'</span>: <span class="kw">case</span> <span class="str">'M'</span>: <span class="var">multiplier</span> = <span class="num">1024</span> * <span class="num">1024</span>; <span class="kw">break</span>;
+    <span class="kw">case</span> <span class="str">'g'</span>: <span class="kw">case</span> <span class="str">'G'</span>: <span class="var">multiplier</span> = <span class="num">1024</span> * <span class="num">1024</span> * <span class="num">1024</span>; <span class="kw">break</span>;
+    <span class="kw">case</span> <span class="str">'t'</span>: <span class="kw">case</span> <span class="str">'T'</span>: <span class="var">multiplier</span> = <span class="kw">static_cast</span>&lt;<span class="type">size_t</span>&gt;(<span class="num">1024UL</span>*<span class="num">1024</span>*<span class="num">1024</span>*<span class="num">1024</span>); <span class="kw">break</span>;
+    <span class="kw">default</span>: <span class="kw">throw</span> ...;
+}
+<span class="kw">return</span> (<span class="kw">static_cast</span>&lt;<span class="type">size_t</span>&gt;(<span class="var">num</span>) * <span class="var">multiplier</span>);</pre>
+      </div>
+      <div class="box box-syntax">
+        <code>static_cast&lt;size_t&gt;(1024UL * 1024 * 1024 * 1024)</code> — o sufixo <code>UL</code> em <code>1024UL</code> força o literal para <code>unsigned long</code>. Sem isso, <code>1024 * 1024 * 1024 * 1024</code> seria calculado em <code>int</code> de 32 bits e daria overflow (o valor é 1TB = 2⁴⁰). Com <code>UL</code>, a aritmética ocorre em unsigned long (64 bits em sistemas modernos). O <code>static_cast&lt;size_t&gt;</code> converte para o tipo de retorno sem warning.
+      </div>
+      <div class="box box-syntax">
+        <code>switch</code> com <code>case 'k': case 'K':</code> — dois cases consecutivos sem <code>break</code> entre eles fazem fall-through intencional: ambos executam o mesmo código (<code>multiplier = 1024; break;</code>). É a forma idiomática C de "aceitar maiúscula ou minúscula".
+      </div>
+    </div>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="name">Por que o parser não valida unicidade de porta</span>
+    </div>
+    <div class="func-body">
+      <div class="func-section">
+        <div class="func-label">O que o parser permite e por quê</div>
+        <div class="func-text">O <code>Config</code> não impõe nenhuma restrição sobre o número de porta em <code>parseServerBlock</code> — qualquer quantidade de blocos <code>server {}</code> pode declarar o mesmo <code>listen</code>. Isso é deliberado: é o que torna possível configurar virtual hosting por nome, onde duas ou mais <code>server {}</code> compartilham a mesma porta e são diferenciadas apenas pelo <code>server_name</code> contra o header <code>Host</code> da requisição. A unicidade real — um socket por porta — já é garantida pelo próprio <code>bind()</code> do sistema operacional; replicar essa checagem no parser, sem ele ter como distinguir "mesma porta, mesmo nome" de "mesma porta, nome diferente", seria decidir cedo demais com informação de menos.</div>
+      </div>
+      <div class="code-block">
+        <div class="code-file">Config.cpp — parseServerBlock(), trecho do listen</div>
+        <pre><span class="kw">else if</span> (<span class="var">tokens</span>[<span class="num">0</span>] == <span class="str">"listen"</span> &amp;&amp; <span class="var">tokens</span>.<span class="fn">size</span>() == <span class="num">2</span>) {
+    <span class="type">int</span> <span class="var">port</span> = <span class="fn">parsePort</span>(<span class="var">tokens</span>[<span class="num">1</span>]);
+    <span class="var">server</span>.<span class="fn">setListenPort</span>(<span class="var">port</span>);
+}</pre>
+      </div>
+      <div class="func-section">
+        <div class="func-label">O que acontece quando duas configs pedem a mesma porta sem nenhuma diferenciação possível</div>
+        <div class="func-text">Em <code>WebServ::setupServers()</code>, cada <code>ServerConfig</code> tenta abrir seu próprio socket de listen dentro de um <code>try/catch</code> independente. Se duas configs pedem exatamente a mesma porta sem nenhuma forma de diferenciação, o segundo <code>bind()</code> falha com <code>EADDRINUSE</code>, o erro é capturado e logado, e o programa segue rodando normalmente nas portas que conseguiram abrir — sem crashar.</div>
+      </div>
+      <div class="box box-flow">
+        O que faz a porta compartilhada funcionar de fato na prática: <code>WebServ::getServerForRequest(req, serverFd)</code> traduz o <code>serverFd</code> (o socket de listen por onde aquele cliente entrou) na porta real via <code>serverSockets</code>, filtra só os <code>ServerConfig</code> que escutam naquela porta, e dentro desse subconjunto escolhe pelo <code>Host</code>/<code>server_name</code> — com fallback pro primeiro server daquela porta se nenhum nome bater. Vale revisar o módulo do <code>WebServ</code> pra ver essa função com detalhe.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s5">
+  <div class="sec-head">
+    <span class="sec-num">05</span>
+    <span class="sec-title">ServerConfig — a estrutura de dados de um servidor</span>
+    <span class="sec-file">ServerConfig.hpp / ServerConfig.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">class</span> <span class="name">ServerConfig</span>
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">Atributos e valores padrão</div>
+        <div class="func-text">O construtor padrão inicializa todos os atributos na lista de inicialização. Isso é importante em C++ — atributos não inicializados têm valores indeterminados (lixo de memória).</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">ServerConfig.cpp — construtor com lista de inicialização</div>
+        <pre>ServerConfig::ServerConfig() :
+    <span class="var">listenPort</span>(<span class="num">8080</span>),         <span class="cmt">// porta padrão se não configurado</span>
+    <span class="var">serverName</span>(<span class="str">""</span>),           <span class="cmt">// sem nome padrão</span>
+    <span class="var">clientMaxBodySize</span>(<span class="num">1048576</span>), <span class="cmt">// 1MB padrão = 1024 * 1024</span>
+    <span class="var">root</span>(<span class="str">""</span>), <span class="var">index</span>(<span class="str">""</span>)
+    {}</pre>
+      </div>
+
+      <div class="box box-syntax">
+        <strong>Lista de inicialização do construtor</strong> (<code>: attr(val), ...</code>) — inicializa os atributos <em>antes</em> do corpo do construtor executar. Para tipos primitivos (<code>int</code>, <code>size_t</code>) é equivalente a uma atribuição no corpo. Para tipos classe (<code>std::string</code>, <code>std::vector</code>) é mais eficiente — evita a construção padrão seguida de atribuição. Em C++, sempre prefira lista de inicialização.
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">Copy constructor e operator=</div>
+        <div class="func-text">Ambos implementados explicitamente. O copy constructor chama o operator= para evitar duplicar a lógica: <code>*this = other</code>. O operator= copia todos os atributos um a um com o guard <code>if (this != &amp;other)</code>.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">ServerConfig.cpp — operator=</div>
+        <pre>ServerConfig &amp;ServerConfig::<span class="kw">operator</span>=(<span class="kw">const</span> ServerConfig &amp;<span class="var">other</span>) {
+    <span class="kw">if</span> (<span class="kw">this</span> != &amp;<span class="var">other</span>) {          <span class="cmt">// auto-atribuição: s = s — evita se-destruir antes de copiar</span>
+        <span class="var">listenPort</span> = <span class="var">other</span>.<span class="var">listenPort</span>;
+        <span class="var">serverName</span> = <span class="var">other</span>.<span class="var">serverName</span>;
+        <span class="var">errorPages</span> = <span class="var">other</span>.<span class="var">errorPages</span>; <span class="cmt">// std::map faz cópia profunda automaticamente</span>
+        <span class="var">clientMaxBodySize</span> = <span class="var">other</span>.<span class="var">clientMaxBodySize</span>;
+        <span class="var">root</span> = <span class="var">other</span>.<span class="var">root</span>;
+        <span class="var">index</span> = <span class="var">other</span>.<span class="var">index</span>;
+        <span class="var">locations</span> = <span class="var">other</span>.<span class="var">locations</span>; <span class="cmt">// vector faz cópia profunda automaticamente</span>
+    }
+    <span class="kw">return</span> (*<span class="kw">this</span>);               <span class="cmt">// retorna referência para permitir s1 = s2 = s3</span>
+}</pre>
+      </div>
+
+      <div class="box box-syntax">
+        <strong>Rule of Three em C++98:</strong> se você define qualquer um dos três — destrutor, copy constructor, operator= — você provavelmente precisa dos três. Aqui todos são definidos porque <code>ServerConfig</code> contém um <code>vector&lt;LocationConfig&gt;</code>. Se o compilador gerasse o copy constructor padrão, ele faria cópia membro a membro — o que funcionaria nesse caso, pois <code>vector</code> já tem seu próprio copy correto. Mas a implementação explícita documenta a intenção.
+      </div>
+
+      <div class="box box-syntax">
+        <strong>Por que <code>return (*this)</code> em operator=?</strong> — o operator= retorna referência para o próprio objeto. Isso permite encadeamento: <code>a = b = c</code> funciona porque <code>b = c</code> retorna <code>b</code>, que é então atribuído a <code>a</code>. Os parênteses em <code>(*this)</code> são estilo — semanticamente equivalente a <code>return *this</code>.
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">O atributo errorPages — map&lt;int, string&gt;</div>
+        <div class="func-text">Mapeia código de erro HTTP (ex: 404) para caminho do arquivo de página de erro (ex: "/404.html"). O <code>addErrorPage</code> simplesmente faz <code>errorPages[code] = path</code> — se o mesmo código aparecer duas vezes no conf, o segundo sobrescreve o primeiro (comportamento do map em inserção com chave existente).</div>
+      </div>
+
+      <table class="detail">
+        <thead><tr><th>Atributo</th><th>Tipo</th><th>Valor padrão</th><th>Setter</th></tr></thead>
+        <tbody>
+          <tr><td>listenPort</td><td>int</td><td>8080</td><td>setListenPort()</td></tr>
+          <tr><td>serverName</td><td>string</td><td>""</td><td>setServerName()</td></tr>
+          <tr><td>errorPages</td><td>map&lt;int,string&gt;</td><td>vazio</td><td>addErrorPage()</td></tr>
+          <tr><td>clientMaxBodySize</td><td>size_t</td><td>1048576 (1MB)</td><td>setClientMaxBodySize()</td></tr>
+          <tr><td>root</td><td>string</td><td>""</td><td>setRoot()</td></tr>
+          <tr><td>index</td><td>string</td><td>""</td><td>setIndex()</td></tr>
+          <tr><td>locations</td><td>vector&lt;LocationConfig&gt;</td><td>vazio</td><td>addLocation()</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s6">
+  <div class="sec-head">
+    <span class="sec-num">06</span>
+    <span class="sec-title">LocationConfig — a estrutura de dados de uma rota</span>
+    <span class="sec-file">LocationConfig.hpp / LocationConfig.cpp</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig">
+      <span class="kw">class</span> <span class="name">LocationConfig</span>
+    </div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">Dois construtores</div>
+        <div class="func-text">Tem um construtor padrão (sem args) e um construtor que recebe o path da location. O path é definido uma única vez na construção — não há setter para ele. Isso é intencional: o path identifica a location e não deve mudar depois.</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">LocationConfig.cpp — construtores</div>
+        <pre><span class="cmt">// Construtor padrão — path vazio</span>
+LocationConfig::LocationConfig() :
+    <span class="var">path</span>(<span class="str">""</span>), <span class="var">root</span>(<span class="str">""</span>), <span class="var">index</span>(<span class="str">""</span>), <span class="var">autoindex</span>(<span class="kw">false</span>),
+    <span class="var">cgiExtension</span>(<span class="str">""</span>), <span class="var">cgiPath</span>(<span class="str">""</span>), <span class="var">clientMaxBodySize</span>(<span class="num">0</span>),
+    <span class="var">uploadStore</span>(<span class="str">""</span>), <span class="var">redirectCode</span>(<span class="num">0</span>), <span class="var">redirectUrl</span>(<span class="str">""</span>)
+    {}
+
+<span class="cmt">// Construtor com path — usado em parseServerBlock</span>
+<span class="cmt">// LocationConfig location(tokens[1]) onde tokens[1] = "/uploads/"</span>
+LocationConfig::LocationConfig(<span class="kw">const</span> <span class="type">std::string</span> &amp;<span class="var">locationPath</span>) :
+    <span class="var">path</span>(<span class="var">locationPath</span>),   <span class="cmt">// só isso muda em relação ao padrão</span>
+    <span class="var">root</span>(<span class="str">""</span>), ...
+    {}</pre>
+      </div>
+
+      <div class="box box-note">
+        <code>clientMaxBodySize</code> começa em <code>0</code> (não em 1MB como no ServerConfig). Isso é intencional: <code>0</code> significa "não configurado nesta location — use o valor do servidor". Em <code>HttpResponse::generateResponse()</code> a lógica é: <code>maxBody = location.clientMaxBodySize &gt; 0 ? location.clientMaxBodySize : server.clientMaxBodySize</code>.
+      </div>
+
+      <div class="func-section">
+        <div class="func-label">allowedMethods — vector&lt;string&gt; e addAllowedMethod</div>
+        <div class="func-text"><code>addAllowedMethod(method)</code> simplesmente faz <code>allowedMethods.push_back(method)</code>. Não valida se o método é um string HTTP válido — aceita qualquer coisa. A validação acontece depois, em <code>HttpResponse</code>, quando compara o método da requisição com o vetor. Separação de responsabilidades: Config não sabe o que é um método HTTP válido, só armazena o que foi configurado.</div>
+      </div>
+
+      <table class="detail">
+        <thead><tr><th>Atributo</th><th>Tipo</th><th>Padrão</th><th>Significado</th></tr></thead>
+        <tbody>
+          <tr><td>path</td><td>string</td><td>""</td><td>O caminho da rota: "/", "/uploads/", "/cgi-bin/"</td></tr>
+          <tr><td>root</td><td>string</td><td>""</td><td>Diretório físico. Vazio = usa root do servidor</td></tr>
+          <tr><td>index</td><td>string</td><td>""</td><td>Arquivo padrão para diretórios</td></tr>
+          <tr><td>autoindex</td><td>bool</td><td>false</td><td>Listar diretório se index não existir</td></tr>
+          <tr><td>allowedMethods</td><td>vector&lt;string&gt;</td><td>vazio</td><td>GET, POST, DELETE — quais são aceitos</td></tr>
+          <tr><td>cgiExtension</td><td>string</td><td>""</td><td>Ex: ".py" ou ".bla" — gatilho para CGI</td></tr>
+          <tr><td>cgiPath</td><td>string</td><td>""</td><td>Executável do CGI: "/usr/bin/python3"</td></tr>
+          <tr><td>clientMaxBodySize</td><td>size_t</td><td>0</td><td>0 = herda do servidor</td></tr>
+          <tr><td>uploadStore</td><td>string</td><td>""</td><td>Diretório destino para uploads POST</td></tr>
+          <tr><td>redirectCode</td><td>int</td><td>0</td><td>0 = sem redirect. 301 ou 302 = redireciona</td></tr>
+          <tr><td>redirectUrl</td><td>string</td><td>""</td><td>URL de destino do redirect</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ -->
+<div class="section" id="s7">
+  <div class="sec-head">
+    <span class="sec-num">07</span>
+    <span class="sec-title">Hierarquia completa — do arquivo ao objeto</span>
+  </div>
+
+  <div class="func">
+    <div class="func-sig"><span class="name">Fluxo de dados completo do módulo Config</span></div>
+    <div class="func-body">
+
+      <div class="func-section">
+        <div class="func-label">Entrada → processamento → saída</div>
+      </div>
+
+      <div class="chain">
+        <span class="ch blue">argv[1] = "webserv.conf"</span>
+        <span class="arr">→</span>
+        <span class="ch">Config::load()</span>
+        <span class="arr">→</span>
+        <span class="ch">stripComment() + tokenize()</span>
+        <span class="arr">→</span>
+        <span class="ch">parseServerBlock()</span>
+        <span class="arr">→</span>
+        <span class="ch">parsePort()</span>
+        <span class="arr">→</span>
+        <span class="ch">parseLocationBlock()</span>
+        <span class="arr">→</span>
+        <span class="ch green">vector&lt;ServerConfig&gt;</span>
+        <span class="arr">→</span>
+        <span class="ch blue">WebServ(config)</span>
+      </div>
+
+      <div class="code-block">
+        <div class="code-file">Resultado em memória após load() do webserv.conf real</div>
+        <pre>Config.servers[0]                       <span class="cmt">// bloco server { listen 8080 }</span>
+  .listenPort    = <span class="num">8080</span>
+  .serverName    = <span class="str">"localhost"</span>
+  .clientMaxBodySize = <span class="num">200000000</span>         <span class="cmt">// 200M do conf</span>
+  .root          = <span class="str">"www"</span>
+  .index         = <span class="str">"index.html"</span>
+  .errorPages    = { <span class="num">404</span>: <span class="str">"/404.html"</span> }
+  .locations[0]                          <span class="cmt">// location / { ... }</span>
+    .path        = <span class="str">"/"</span>
+    .allowedMethods = [<span class="str">"GET"</span>]
+    .autoindex   = <span class="kw">true</span>
+    .root        = <span class="str">"www"</span>
+    .index       = <span class="str">"index.html"</span>
+    .cgiExtension= <span class="str">".bla"</span>
+    .cgiPath     = <span class="str">"./cgi_tester"</span>
+  .locations[1]                          <span class="cmt">// location /google { ... }</span>
+    .path        = <span class="str">"/google"</span>
+    .allowedMethods = [<span class="str">"GET"</span>]
+    .redirectCode= <span class="num">302</span>
+    .redirectUrl = <span class="str">"https://www.google.com"</span>
+  .locations[2]                          <span class="cmt">// location /cgi-bin/ { ... }</span>
+    .path        = <span class="str">"/cgi-bin/"</span>
+    .allowedMethods = [<span class="str">"GET"</span>, <span class="str">"POST"</span>]
+    .root        = <span class="str">"www/cgi-bin"</span>
+    .cgiExtension= <span class="str">".py"</span>
+    .cgiPath     = <span class="str">"/usr/bin/python3"</span>
+  .locations[3]                          <span class="cmt">// location /directory/ { ... }</span>
+    .path        = <span class="str">"/directory/"</span>
+    .allowedMethods = [<span class="str">"GET"</span>, <span class="str">"POST"</span>]
+    .root        = <span class="str">"YoupiBanane"</span>
+    .index       = <span class="str">"youpi.bad_extension"</span>
+    .cgiExtension= <span class="str">".bla"</span>
+    .cgiPath     = <span class="str">"./cgi_tester"</span>
+  .locations[4]                          <span class="cmt">// location /post_body { ... }</span>
+    .path        = <span class="str">"/post_body"</span>
+    .allowedMethods = [<span class="str">"POST"</span>]
+    .clientMaxBodySize = <span class="num">100</span>            <span class="cmt">// sobrescreve o do servidor</span>
+  .locations[5]                          <span class="cmt">// location /uploads/ { ... }</span>
+    .path        = <span class="str">"/uploads/"</span>
+    .allowedMethods = [<span class="str">"GET"</span>, <span class="str">"POST"</span>, <span class="str">"DELETE"</span>]
+    .root        = <span class="str">"www/uploads"</span>
+    .uploadStore = <span class="str">"www/uploads"</span>
+    .autoindex   = <span class="kw">true</span>
+
+Config.servers[1]                       <span class="cmt">// bloco server { listen 8081 }</span>
+  .listenPort    = <span class="num">8081</span>
+  .clientMaxBodySize = <span class="num">100000000</span>
+  .locations[0]  <span class="cmt">// location / { allow_methods GET autoindex on }</span>
+  .locations[1]  <span class="cmt">// location /files { allow_methods GET POST }</span></pre>
+      </div>
+
+      <div class="box box-flow">
+        <strong>Quem usa esse resultado depois:</strong> o <code>WebServ</code> guarda uma referência <code>Config &amp;config</code>. Em <code>setupServers()</code> itera sobre <code>config.getServers()</code> para criar um socket de listen por porta. Em <code>getServerForRequest(req, serverFd)</code>, primeiro filtra os <code>ServerConfig</code> que escutam na porta real por onde aquele cliente entrou (via <code>serverFd</code> → <code>serverSockets</code>), e só dentro desse subconjunto desempata pelo header <code>Host</code> contra <code>server_name</code>. Em <code>handleClientRead()</code>, passa o ServerConfig correto para <code>HttpResponse::generateResponse()</code> que usa as locations para rotear a requisição.
+      </div>
+
+      <div class="box box-warn">
+        O módulo Config <strong>não persiste</strong> depois do startup — os objetos <code>ServerConfig</code> e <code>LocationConfig</code> ficam vivos durante toda a execução do servidor porque <code>WebServ</code> guarda referência ao <code>Config</code> que por sua vez mantém o <code>vector&lt;ServerConfig&gt;</code> em memória. Modificar o conf em disco enquanto o servidor está rodando não tem efeito — seria necessário reiniciar.
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+</div><!-- /page -->
+</body>
+</html>

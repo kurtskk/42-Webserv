@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webserv — Guia de Estudo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Nunito:wght@300;400;600;700;800&display=swap');
+:root{
+  --bg:#0e1117;--s1:#161b27;--s2:#1d2535;--s3:#242e42;
+  --border:#2d3a52;--border2:#3d4f6e;
+  --green:#4ade80;--blue:#60a5fa;--yellow:#fbbf24;
+  --red:#f87171;--purple:#c084fc;--cyan:#22d3ee;--orange:#fb923c;
+  --text:#e2e8f0;--muted:#64748b;--muted2:#94a3b8;
+  --mono:'Fira Code',monospace;--sans:'Nunito',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.65}
+
+/* ── TOP BAR ── */
+.topbar{background:var(--s1);border-bottom:1px solid var(--border);padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;position:sticky;top:0;z-index:200}
+.topbar-title{font-size:1rem;font-weight:800;color:var(--green);letter-spacing:-.01em}
+.topbar-title span{color:var(--muted2);font-weight:400}
+.topbar-nav{display:flex;gap:.4rem;flex-wrap:wrap}
+.topbar-nav a{font-family:var(--mono);font-size:.65rem;color:var(--muted2);text-decoration:none;background:var(--s2);border:1px solid var(--border);border-radius:4px;padding:.25rem .55rem;transition:all .15s}
+.topbar-nav a:hover{color:var(--cyan);border-color:var(--cyan)}
+
+/* ── HERO ── */
+.hero{padding:2.5rem 1.5rem 2rem;text-align:center;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(96,165,250,.04) 0%,transparent 100%)}
+.hero h1{font-size:clamp(1.6rem,4vw,2.6rem);font-weight:800;letter-spacing:-.03em;color:var(--text);margin-bottom:.5rem}
+.hero h1 em{color:var(--green);font-style:normal}
+.hero p{color:var(--muted2);font-size:.9rem;max-width:520px;margin:0 auto}
+
+/* ── LAYOUT ── */
+.page{max-width:860px;margin:0 auto;padding:1.5rem 1.2rem 5rem}
+
+/* ── CHAPTER ── */
+.chapter{margin-top:2.5rem}
+.ch-head{display:flex;align-items:center;gap:.8rem;margin-bottom:1.2rem;padding-bottom:.8rem;border-bottom:2px solid var(--border)}
+.ch-num{font-family:var(--mono);font-size:.65rem;font-weight:600;background:var(--blue);color:#000;padding:.2rem .5rem;border-radius:3px;letter-spacing:.06em;white-space:nowrap}
+.ch-title{font-size:1.05rem;font-weight:800;color:var(--text)}
+.ch-sub{font-size:.78rem;color:var(--muted2);margin-left:auto;font-family:var(--mono)}
+
+/* ── FLOW CARD ── */
+.flow{background:var(--s1);border:1px solid var(--border);border-radius:8px;margin-bottom:1rem;overflow:hidden}
+.flow-head{background:var(--s2);padding:.7rem 1rem;display:flex;align-items:center;gap:.6rem;border-bottom:1px solid var(--border)}
+.flow-icon{font-size:1rem}
+.flow-title{font-weight:700;font-size:.9rem;color:var(--text)}
+.flow-file{font-family:var(--mono);font-size:.7rem;color:var(--cyan);margin-left:auto;white-space:nowrap}
+.flow-body{padding:.85rem 1rem;font-size:.88rem;color:var(--muted2);line-height:1.75}
+.flow-body p{margin-bottom:.5rem}
+.flow-body p:last-child{margin-bottom:0}
+
+/* ── CALL CHAIN ── */
+.chain{padding:.5rem 1rem .85rem;display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;border-top:1px solid var(--border)}
+.fn{font-family:var(--mono);font-size:.72rem;background:var(--s3);border:1px solid var(--border2);border-radius:3px;padding:.2rem .5rem;color:var(--green);white-space:nowrap}
+.fn.red{color:var(--red);border-color:rgba(248,113,113,.3)}
+.fn.yellow{color:var(--yellow);border-color:rgba(251,191,36,.3)}
+.fn.purple{color:var(--purple);border-color:rgba(192,132,252,.3)}
+.fn.orange{color:var(--orange);border-color:rgba(251,146,60,.3)}
+.fn.cyan{color:var(--cyan);border-color:rgba(34,211,238,.3)}
+.arr{color:var(--muted);font-size:.75rem}
+
+/* ── BIG FLOW DIAGRAM ── */
+.diagram{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.2rem;overflow-x:auto}
+.diagram-title{font-family:var(--mono);font-size:.7rem;font-weight:600;color:var(--muted2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.85rem}
+.dia-row{display:flex;align-items:stretch;gap:.3rem;margin-bottom:.4rem;flex-wrap:nowrap}
+.dia-box{background:var(--s2);border:1px solid var(--border);border-radius:5px;padding:.45rem .7rem;font-family:var(--mono);font-size:.72rem;color:var(--text);white-space:nowrap;display:flex;align-items:center;gap:.4rem;flex-shrink:0}
+.dia-box.green{border-color:rgba(74,222,128,.4);color:var(--green)}
+.dia-box.blue{border-color:rgba(96,165,250,.4);color:var(--blue)}
+.dia-box.yellow{border-color:rgba(251,191,36,.4);color:var(--yellow)}
+.dia-box.red{border-color:rgba(248,113,113,.4);color:var(--red)}
+.dia-box.purple{border-color:rgba(192,132,252,.4);color:var(--purple)}
+.dia-box.cyan{border-color:rgba(34,211,238,.4);color:var(--cyan)}
+.dia-box.orange{border-color:rgba(251,146,60,.4);color:var(--orange)}
+.dia-arrow{color:var(--muted);font-size:.9rem;display:flex;align-items:center;flex-shrink:0}
+.dia-label{font-size:.65rem;color:var(--muted);font-style:italic;align-self:center}
+.dia-wrap{flex-wrap:wrap}
+
+/* ── DECISION BOX ── */
+.decision{background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.3);border-radius:6px;padding:.7rem 1rem;margin:.5rem 0;font-size:.85rem;color:var(--yellow)}
+.decision strong{color:#fde68a}
+
+/* ── NOTE ── */
+.note{background:rgba(96,165,250,.06);border-left:3px solid var(--blue);border-radius:0 6px 6px 0;padding:.65rem 1rem;margin:.6rem 0;font-size:.83rem;color:var(--muted2)}
+.note strong{color:var(--blue)}
+
+/* ── WHY BOX ── */
+.why{background:rgba(192,132,252,.06);border-left:3px solid var(--purple);border-radius:0 6px 6px 0;padding:.65rem 1rem;margin:.6rem 0;font-size:.83rem;color:var(--muted2)}
+.why::before{content:'💡 Por que: ';font-weight:700;color:var(--purple)}
+
+/* ── STATE TABLE ── */
+.states{width:100%;border-collapse:collapse;font-size:.8rem;margin:.6rem 0}
+.states th{background:var(--s3);padding:.5rem .8rem;text-align:left;font-family:var(--mono);font-size:.68rem;color:var(--muted2);border-bottom:1px solid var(--border)}
+.states td{padding:.5rem .8rem;border-bottom:1px solid var(--border);vertical-align:top}
+.states tr:last-child td{border-bottom:none}
+.states td:first-child{font-family:var(--mono);font-size:.72rem;color:var(--cyan)}
+.states td:nth-child(2){color:var(--yellow);font-family:var(--mono);font-size:.72rem}
+.states td:last-child{color:var(--muted2)}
+
+/* ── DIVIDER ── */
+hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">webserv <span>// guia de estudo</span></div>
+  <nav class="topbar-nav">
+    <a href="#s0">Visão Geral</a>
+    <a href="#s1">Startup</a>
+    <a href="#s2">Loop</a>
+    <a href="#s3">Requisição</a>
+    <a href="#s4">Resposta</a>
+    <a href="#s5">CGI</a>
+    <a href="#s6">Escrita</a>
+    <a href="#s7">Config</a>
+    <a href="#s8">Decisões</a>
+  </nav>
+</div>
+
+<div class="hero">
+  <h1>Como o <em>webserv</em> funciona</h1>
+  <p>Fluxo completo do código — do main() até a resposta chegar no browser. Baseado no código real do projeto.</p>
+</div>
+
+<div class="page">
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="chapter" id="s0">
+  <div class="ch-head">
+    <span class="ch-num">00</span>
+    <span class="ch-title">Visão Geral — O que existe e quem faz o quê</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🏗</span><span class="flow-title">As 6 classes do projeto</span></div>
+    <div class="flow-body">
+      <p><strong style="color:var(--green)">Config</strong> → lê e valida o webserv.conf. Produz uma lista de <strong style="color:var(--blue)">ServerConfig</strong>.</p>
+      <p><strong style="color:var(--blue)">ServerConfig</strong> → representa um bloco <code>server {}</code>. Guarda porta, nome, error_pages, body_size e uma lista de <strong style="color:var(--cyan)">LocationConfig</strong>.</p>
+      <p><strong style="color:var(--cyan)">LocationConfig</strong> → representa um bloco <code>location {}</code>. Guarda root, métodos, CGI, redirect, autoindex, upload_store.</p>
+      <p><strong style="color:var(--yellow)">WebServ</strong> → o motor. Tem o loop com poll(), aceita conexões, despacha leitura/escrita, gerencia CGI.</p>
+      <p><strong style="color:var(--orange)">Client</strong> → representa uma conexão aberta. Acumula o buffer de requisição, guarda o estado da resposta e os fds do CGI.</p>
+      <p><strong style="color:var(--purple)">HttpRequest</strong> → parse do texto cru da requisição. Produz método, URI, headers, body.</p>
+      <p><strong style="color:var(--red)">HttpResponse</strong> → gera a resposta. Decide se é arquivo, redirect, CGI ou erro. Constrói o header HTTP.</p>
+      <p><strong style="color:var(--muted2)">CgiHandler</strong> → faz fork+pipe+execve. Monta as variáveis de ambiente do CGI.</p>
+      <p><strong style="color:var(--muted2)">SocketUtils</strong> → helper estático. Cria socket TCP, faz bind/listen, seta O_NONBLOCK.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-title">Quem conhece quem</div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box green">main()</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box green">Config::load()</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box blue">ServerConfig[]</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box cyan">LocationConfig[]</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box green">main()</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box yellow">WebServ</div>
+      <div class="dia-arrow">→ contém →</div>
+      <div class="dia-box orange">map&lt;fd, Client*&gt;</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box yellow">WebServ::handleClientRead</div>
+      <div class="dia-arrow">→ cria →</div>
+      <div class="dia-box purple">HttpRequest</div>
+      <div class="dia-arrow">→ passa para →</div>
+      <div class="dia-box red">HttpResponse::generateResponse</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box red">HttpResponse</div>
+      <div class="dia-arrow">→ se CGI →</div>
+      <div class="dia-box">CgiHandler::startCgi</div>
+      <div class="dia-arrow">→ fork+execve →</div>
+      <div class="dia-box">processo filho</div>
+    </div>
+  </div>
+
+  <div class="note"><strong>Regra de ouro:</strong> WebServ é o único dono do poll(). Ninguém mais chama recv/send/read/write em socket sem ter passado pelo poll() antes.</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="chapter" id="s1">
+  <div class="ch-head">
+    <span class="ch-num">01</span>
+    <span class="ch-title">Startup — Do main() até o servidor estar ouvindo</span>
+    <span class="ch-sub">main.cpp → Config → WebServ</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">1️⃣</span><span class="flow-title">main() — ponto de entrada</span><span class="flow-file">srcs/main.cpp</span></div>
+    <div class="flow-body">
+      <p>Registra o handler de SIGINT (<code>WebServ::signalHandler</code>) que seta <code>isRunning = false</code> — o loop para limpo.</p>
+      <p>Valida que argc == 2. Cria <code>Config</code>, chama <code>config.load(argv[1])</code>. Cria <code>WebServ</code> com a config. Chama <code>setupServers()</code>. Chama <code>run()</code>.</p>
+      <p>Tudo dentro de try/catch — qualquer exceção lançada no startup imprime o erro e retorna 1.</p>
+    </div>
+    <div class="chain">
+      <span class="fn">main()</span><span class="arr">→</span>
+      <span class="fn yellow">signal(SIGINT)</span><span class="arr">→</span>
+      <span class="fn">Config::load()</span><span class="arr">→</span>
+      <span class="fn">WebServ::setupServers()</span><span class="arr">→</span>
+      <span class="fn">WebServ::run()</span>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">2️⃣</span><span class="flow-title">Config::load() — lê o arquivo de configuração</span><span class="flow-file">srcs/config/Config.cpp</span></div>
+    <div class="flow-body">
+      <p>Abre o arquivo com <code>std::ifstream</code>. Lê linha por linha. Para cada linha: remove comentários (<code>stripComment</code>), tokeniza (<code>tokenize</code>).</p>
+      <p>Quando encontra <code>server {</code> → chama <code>parseServerBlock()</code> que preenche um <code>ServerConfig</code>. Dentro do server block, quando encontra <code>location /path {</code> → chama <code>parseLocationBlock()</code> que preenche um <code>LocationConfig</code>.</p>
+      <p>O parser não impõe restrição sobre o número de porta — vários blocos <code>server {}</code> podem declarar o mesmo <code>listen</code>, o que é o que permite virtual hosting por nome (server_names diferentes compartilhando a mesma porta). O resultado é um <code>vector&lt;ServerConfig&gt;</code> com tudo preenchido.</p>
+    </div>
+    <div class="chain">
+      <span class="fn">Config::load()</span><span class="arr">→</span>
+      <span class="fn">stripComment()</span><span class="arr">→</span>
+      <span class="fn">tokenize()</span><span class="arr">→</span>
+      <span class="fn">parseServerBlock()</span><span class="arr">→</span>
+      <span class="fn">parseLocationBlock()</span>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">3️⃣</span><span class="flow-title">WebServ::setupServers() — abre os sockets de listen</span><span class="flow-file">srcs/server/WebServ.cpp</span></div>
+    <div class="flow-body">
+      <p>Itera sobre os <code>ServerConfig</code>. Para cada um chama <code>SocketUtils::createListeningSocket(port)</code>.</p>
+      <p>Esse helper faz: <code>socket()</code> → <code>setsockopt(SO_REUSEADDR)</code> → aumenta SO_RCVBUF/SO_SNDBUF para 1MB → <code>bind()</code> → <code>listen(SOMAXCONN)</code> → <code>setNonBlocking()</code>.</p>
+      <p>O fd retornado é salvo em <code>serverSockets[listenFd] = port</code> e adicionado ao array <code>pollfds</code> com evento <code>POLLIN</code>.</p>
+      <p>Tudo dentro de try/catch individual — se uma porta falhar, as outras continuam.</p>
+    </div>
+    <div class="chain">
+      <span class="fn">setupServers()</span><span class="arr">→</span>
+      <span class="fn cyan">SocketUtils::createListeningSocket()</span><span class="arr">→</span>
+      <span class="fn">socket() bind() listen()</span><span class="arr">→</span>
+      <span class="fn">setNonBlocking()</span><span class="arr">→</span>
+      <span class="fn green">addPollFd(listenFd, POLLIN)</span>
+    </div>
+  </div>
+
+  <div class="why">O servidor usa O_NONBLOCK em todos os fds porque o poll() precisa saber quando o fd está pronto — se os fds fossem bloqueantes, um único recv() lento travaria todas as outras conexões. Com non-blocking, se não há dados o recv retorna imediatamente e o loop continua.</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="chapter" id="s2">
+  <div class="ch-head">
+    <span class="ch-num">02</span>
+    <span class="ch-title">O Loop Principal — WebServ::run()</span>
+    <span class="ch-sub">srcs/server/WebServ.cpp</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🔁</span><span class="flow-title">O coração do servidor — while(isRunning)</span><span class="flow-file">WebServ::run()</span></div>
+    <div class="flow-body">
+      <p>O loop tem duas fases por iteração:</p>
+      <p><strong style="color:var(--yellow)">Fase 1 — Timeout de CGI:</strong> antes de processar revents, itera sobre todos os clientes e verifica <code>isCgiTimedOut()</code>. Se ultrapassou 120s → mata o processo (<code>kill(SIGKILL)</code> + <code>waitpid</code>) → prepara resposta 504 → coloca o fd do cliente em POLLOUT.</p>
+      <p><strong style="color:var(--blue)">Fase 2 — Processar revents:</strong> itera sobre o array pollfds. Categoriza cada fd pronto em 3 tipos e despacha para o handler correto. Após cada handler chama <code>break</code> — só processa um fd pronto por iteração do loop.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-title">Categorização dos fds dentro do loop</div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box yellow">fd pronto</div>
+      <div class="dia-arrow">→ está em serverSockets? →</div>
+      <div class="dia-box green">SIM → acceptNewConnection(fd)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box yellow">fd pronto</div>
+      <div class="dia-arrow">→ está em cgiPipeToClient? →</div>
+      <div class="dia-box purple">SIM + POLLIN → handleCgiRead(fd)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box" style="opacity:0;width:5rem"></div>
+      <div class="dia-arrow" style="opacity:0">→</div>
+      <div class="dia-box purple">SIM + POLLOUT → handleCgiWrite(fd)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box yellow">fd pronto</div>
+      <div class="dia-arrow">→ else (cliente) →</div>
+      <div class="dia-box blue">POLLIN → handleClientRead(fd)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box" style="opacity:0;width:5rem"></div>
+      <div class="dia-arrow" style="opacity:0">→</div>
+      <div class="dia-box blue">POLLOUT → handleClientWrite(fd)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box" style="opacity:0;width:5rem"></div>
+      <div class="dia-arrow" style="opacity:0">→</div>
+      <div class="dia-box red">POLLERR/HUP → removeClient(fd)</div>
+    </div>
+  </div>
+
+  <div class="note"><strong>Por que o break?</strong> O array pollfds pode ser modificado pelos handlers (addPollFd, removePollFd). Iterar sobre um vector que mudou seria UB. O break reinicia o loop com o array atualizado — seguro e simples.</div>
+
+  <div class="why">Só um poll() no loop inteiro porque o subject exige isso. Ter dois poll() (um para listen, outro para clientes) violaria a regra e tiraria 0. O design de ter o array pollfds como vetor dinâmico permite adicionar/remover fds (novos clientes, pipes de CGI) sem precisar de múltiplos selects.</why>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="chapter" id="s3">
+  <div class="ch-head">
+    <span class="ch-num">03</span>
+    <span class="ch-title">Chegada de uma Requisição</span>
+    <span class="ch-sub">acceptNewConnection → handleClientRead → HttpRequest</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🤝</span><span class="flow-title">acceptNewConnection() — nova conexão TCP</span><span class="flow-file">WebServ::acceptNewConnection()</span></div>
+    <div class="flow-body">
+      <p>Chama <code>accept(serverFd, ...)</code>. Se retornar um fd válido: seta non-blocking com <code>SocketUtils::setNonBlocking()</code>, aumenta buffers do socket novo (1MB recv/send), cria <code>new Client(clientFd, serverFd)</code>, salva em <code>clients[clientFd]</code>, adiciona ao pollfds com <code>POLLIN</code>.</p>
+      <p>A partir desse momento o fd do novo cliente entra no loop e será processado nas próximas iterações.</p>
+    </div>
+    <div class="chain">
+      <span class="fn">acceptNewConnection()</span><span class="arr">→</span>
+      <span class="fn">accept()</span><span class="arr">→</span>
+      <span class="fn cyan">setNonBlocking()</span><span class="arr">→</span>
+      <span class="fn orange">new Client()</span><span class="arr">→</span>
+      <span class="fn green">addPollFd(clientFd, POLLIN)</span>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">📥</span><span class="flow-title">handleClientRead() — dados chegando</span><span class="flow-file">WebServ::handleClientRead()</span></div>
+    <div class="flow-body">
+      <p><strong>1.</strong> Chama <code>recv(clientFd, buffer, 65536, 0)</code>. Se retornar 0 → cliente fechou → <code>removeClient()</code>. Se negativo → erro → também <code>removeClient()</code>.</p>
+      <p><strong>2.</strong> Se dados chegaram: <code>client->appendRequest(buffer, bytesRead)</code> — acumula no <code>requestBuffer</code> do Client.</p>
+      <p><strong>3.</strong> Chama <code>client->isRequestComplete()</code> para verificar se já temos a requisição inteira.</p>
+      <p><strong>4.</strong> Verifica tamanho: <code>client->isRequestTooLarge(maxBody)</code> — se passou do limite → resposta 413 → POLLOUT.</p>
+      <p><strong>5.</strong> Verifica Expect: 100-continue — se o cliente avisou que vai mandar um body grande, enviamos <code>HTTP/1.1 100 Continue</code> primeiro.</p>
+      <p><strong>6.</strong> Se a requisição está completa → constrói <code>HttpRequest</code> → chama <code>HttpResponse::generateResponse()</code>.</p>
+    </div>
+    <div class="chain">
+      <span class="fn">recv()</span><span class="arr">→</span>
+      <span class="fn orange">appendRequest()</span><span class="arr">→</span>
+      <span class="fn orange">isRequestComplete()</span><span class="arr">→</span>
+      <span class="fn orange">isRequestTooLarge()</span><span class="arr">→</span>
+      <span class="fn purple">new HttpRequest(buffer)</span><span class="arr">→</span>
+      <span class="fn red">generateResponse()</span>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🔍</span><span class="flow-title">Client::isRequestComplete() — quando parar de acumular?</span><span class="flow-file">srcs/server/Client.cpp</span></div>
+    <div class="flow-body">
+      <p>Primeiro verifica se já encontrou <code>\r\n\r\n</code> (fim dos headers). Se não, ainda não temos nem os headers — retorna false.</p>
+      <p>Quando os headers chegaram: lê <code>Content-Length</code> e verifica se o buffer tem headers + body completos. Se sim → requisição completa.</p>
+      <p>Se for <code>Transfer-Encoding: chunked</code>: espera <code>0\r\n\r\n</code> no final do buffer — sinal de fim do chunked.</p>
+      <p>Se não tem Content-Length nem chunked → requisição sem body → completa ao receber os headers.</p>
+      <p>Também detecta o header <code>Expect: 100-continue</code> — seta <code>needs100Continue = true</code>.</p>
+    </div>
+    <div class="chain">
+      <span class="fn orange">isRequestComplete()</span><span class="arr">→ busca →</span>
+      <span class="fn">\r\n\r\n</span><span class="arr">→ lê →</span>
+      <span class="fn">Content-Length</span><span class="arr">→ ou →</span>
+      <span class="fn">chunked 0\r\n\r\n</span>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">📝</span><span class="flow-title">HttpRequest — parse do texto cru</span><span class="flow-file">srcs/http/HttpRequest.cpp</span></div>
+    <div class="flow-body">
+      <p>O construtor recebe a string crua completa. Divide em <em>header part</em> (antes do <code>\r\n\r\n</code>) e <em>body</em>.</p>
+      <p>Se for chunked: chama <code>decodeChunkedBody()</code> — um parser que lê tamanho em hex, extrai o chunk, até chegar em chunk de tamanho 0.</p>
+      <p>Se não for chunked: lê Content-Length e corta o body no tamanho exato.</p>
+      <p><code>parseRequestLine()</code>: extrai método, URI, versão. Valida que o método é letras maiúsculas, URI começa com '/', versão começa com "HTTP/". Se qualquer coisa falhar → <code>valid = false</code>.</p>
+      <p><code>parseHeader()</code>: para cada linha restante, encontra o ':' e separa chave → valor em um <code>map&lt;string, string&gt;</code>.</p>
+      <p><code>getCookie(name)</code>: lê o header Cookie e faz parse manualmente — divide por ';', encontra o par nome=valor desejado.</p>
+    </div>
+    <div class="chain">
+      <span class="fn purple">HttpRequest(raw)</span><span class="arr">→</span>
+      <span class="fn">find \r\n\r\n</span><span class="arr">→</span>
+      <span class="fn">decodeChunkedBody()</span><span class="arr">ou</span>
+      <span class="fn">substr(Content-Length)</span><span class="arr">→</span>
+      <span class="fn">parseRequestLine()</span><span class="arr">→</span>
+      <span class="fn">parseHeader() ×N</span>
+    </div>
+  </div>
+
+  <div class="why">O Client acumula dados em vez de parsear na hora porque TCP pode fragmentar — a requisição pode chegar em vários pacotes. Só quando isRequestComplete() confirma que temos tudo é que construímos o HttpRequest. Assim garantimos que o parse sempre recebe dados completos.</why>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="chapter" id="s4">
+  <div class="ch-head">
+    <span class="ch-num">04</span>
+    <span class="ch-title">Geração da Resposta — HttpResponse::generateResponse()</span>
+    <span class="ch-sub">srcs/http/HttpResponse.cpp</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🧭</span><span class="flow-title">generateResponse() — o grande dispatcher</span><span class="flow-file">HttpResponse::generateResponse()</span></div>
+    <div class="flow-body">
+      <p>Recebe o <code>HttpRequest</code>, o <code>ServerConfig</code> e a referência ao map de <code>sessions</code>. Toma todas as decisões de roteamento.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-title">Fluxo de decisão dentro de generateResponse()</div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box blue">URI == /session_login ou /session_profile?</div>
+      <div class="dia-arrow">→ SIM →</div>
+      <div class="dia-box cyan">trata sessão → retorna imediatamente</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box blue">longest-prefix match nas locations</div>
+      <div class="dia-arrow">→ não encontrou →</div>
+      <div class="dia-box red">setErrorResponse(404) → retorna</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box blue">location tem redirect?</div>
+      <div class="dia-arrow">→ SIM →</div>
+      <div class="dia-box yellow">status 301/302 + Location header → retorna</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box blue">método está em allowedMethods?</div>
+      <div class="dia-arrow">→ NÃO →</div>
+      <div class="dia-box red">setErrorResponse(405) → retorna</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box blue">body maior que client_max_body_size?</div>
+      <div class="dia-arrow">→ SIM →</div>
+      <div class="dia-box red">413 → retorna</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box blue">extensão do arquivo == cgi_ext da location?</div>
+      <div class="dia-arrow">→ SIM →</div>
+      <div class="dia-box purple">needsCgi=true + seta paths → retorna ""</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box blue">método?</div>
+      <div class="dia-arrow">→ GET →</div>
+      <div class="dia-box green">handleGet()</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box" style="opacity:0;width:5rem"></div>
+      <div class="dia-arrow">→ POST →</div>
+      <div class="dia-box orange">handlePost()</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box" style="opacity:0;width:5rem"></div>
+      <div class="dia-arrow">→ DELETE →</div>
+      <div class="dia-box red">handleDelete()</div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🗺</span><span class="flow-title">Longest-prefix matching — como encontra a location certa</span></div>
+    <div class="flow-body">
+      <p>Remove a barra final da URI de busca. Itera sobre todas as locations do ServerConfig. Para cada location: verifica se a URI <em>começa com</em> o path da location. Guarda a que tiver o path mais longo que casou.</p>
+      <p>Exemplo: URI <code>/cgi-bin/hello.py</code> → location <code>/</code> casa (1 char), location <code>/cgi-bin/</code> casa (8 chars) → vence <code>/cgi-bin/</code>.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">📂</span><span class="flow-title">handleGet() — servindo arquivos e diretórios</span></div>
+    <div class="flow-body">
+      <p>Chama <code>stat(targetFile)</code>. Se for diretório e <code>autoindex == true</code>: faz <code>opendir()</code> + <code>readdir()</code> e gera HTML com links. Se autoindex false e é diretório → 404.</p>
+      <p>Se for arquivo regular: seta <code>isFileResponse = true</code>, guarda o path e o tamanho. Determina Content-Type pela extensão (<code>.css</code>, <code>.png</code>, <code>.jpg</code>, default <code>text/html</code>).</p>
+      <p>Quando <code>isFileResponse = true</code>, o arquivo <strong>não é carregado na memória agora</strong> — só o header é gerado. O arquivo é servido em chunks de 64KB pelo <code>Client::getResponseData()</code> na fase de escrita.</p>
+    </div>
+    <div class="chain">
+      <span class="fn green">handleGet()</span><span class="arr">→</span>
+      <span class="fn">stat()</span><span class="arr">→ dir? →</span>
+      <span class="fn">opendir() readdir()</span><span class="arr">ou arquivo →</span>
+      <span class="fn orange">isFileResponse=true</span>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">📤</span><span class="flow-title">handlePost() — upload de arquivos</span></div>
+    <div class="flow-body">
+      <p>Verifica se Content-Type é <code>multipart/form-data</code>. Extrai o <code>boundary</code> do header. Busca o boundary no body, pula para o <code>\r\n\r\n</code> do part header para chegar no conteúdo do arquivo. Extrai o <code>filename</code> do Content-Disposition do part.</p>
+      <p>Determina o <code>upload_store</code> da location (ou "upload_store" como default). Abre o arquivo com <code>std::ofstream</code> e escreve o conteúdo. Retorna 201 Created.</p>
+      <p>Se não for multipart → retorna 201 com o body cru no corpo da resposta (útil para testes com curl -d).</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🗑</span><span class="flow-title">handleDelete() — remoção de arquivo</span></div>
+    <div class="flow-body">
+      <p>Simplesmente chama <code>unlink(targetFile)</code>. Se retornar 0 → 200 OK. Se falhar → 404 Not Found.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🔨</span><span class="flow-title">buildResponseHeader() — construindo o header HTTP</span></div>
+    <div class="flow-body">
+      <p>Monta a string: <code>HTTP/1.1 [statusCode] [statusMessage]\r\n</code> + Content-Type + Content-Length + Location (se redirect) + Set-Cookie para cada cookie + <code>Connection: close\r\n\r\n</code>.</p>
+      <p>Se for fileResponse, Content-Length usa <code>fileSize</code>. Se não, usa <code>body.length()</code>.</p>
+    </div>
+  </div>
+
+  <div class="why">A decisão de CGI acontece em generateResponse() — ela apenas seta needsCgi=true e retorna string vazia. Quem de fato executa o CGI é o WebServ::handleClientRead() que chama CgiHandler::startCgi() logo depois. Separar "decidir" de "executar" mantém HttpResponse sem dependências de sistema (sem fork, sem pipes).</why>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="chapter" id="s5">
+  <div class="ch-head">
+    <span class="ch-num">05</span>
+    <span class="ch-title">CGI — Fork, Pipes e Execve</span>
+    <span class="ch-sub">CgiHandler → WebServ → Client</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">⚙️</span><span class="flow-title">O ciclo completo do CGI</span></div>
+    <div class="flow-body">
+      <p>O CGI tem 4 fases: <strong>1)</strong> startCgi (fork+pipe), <strong>2)</strong> escrita do body ao CGI (handleCgiWrite), <strong>3)</strong> leitura da saída do CGI (handleCgiRead), <strong>4)</strong> finishCgi (parse do output e envio ao cliente).</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-title">Fluxo completo do CGI</div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box blue">handleClientRead detecta needsCgi=true</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box">CgiHandler::startCgi()</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box">startCgi()</div>
+      <div class="dia-arrow">→ fork() →</div>
+      <div class="dia-box green">filho: dup2+execve(python3 script.py)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box">startCgi()</div>
+      <div class="dia-arrow">→ pai retorna →</div>
+      <div class="dia-box orange">CgiProcess{pid, pipeIn, pipeOut, tmpFd}</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box blue">handleClientRead salva proc no Client</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box purple">addPollFd(pipeIn, POLLOUT) + addPollFd(pipeOut, POLLIN)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box purple">poll detecta pipeIn POLLOUT</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box">handleCgiWrite() → write(body ao CGI)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box purple">poll detecta pipeOut POLLIN</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box">handleCgiRead() → read() → write(tmpFd)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box purple">pipeOut fecha (CGI terminou)</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box yellow">finishCgi() → parse header CGI → client.setFileResponse(tmp)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box yellow">setPollEvent(clientFd, POLLOUT)</div>
+      <div class="dia-arrow">→</div>
+      <div class="dia-box green">handleClientWrite envia resposta ao browser</div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🍴</span><span class="flow-title">CgiHandler::startCgi() — o fork</span><span class="flow-file">srcs/http/CgiHandler.cpp</span></div>
+    <div class="flow-body">
+      <p><strong>Antes do fork:</strong> cria dois pipes (<code>pipeIn[2]</code> e <code>pipeOut[2]</code>). Chama <code>buildEnvp()</code> para montar as variáveis de ambiente. Cria arquivo temporário <code>/tmp/webserv_cgi_PID_TIME_COUNTER</code> para guardar a saída do CGI.</p>
+      <p><strong>Processo filho (pid==0):</strong> fecha as pontas desnecessárias dos pipes. <code>dup2(pipeIn[0], STDIN)</code> → stdin vira o pipe de entrada. <code>dup2(pipeOut[1], STDOUT)</code> → stdout vira o pipe de saída. Fecha os fds originais. Monta argv = [cgiPath, scriptFile, NULL]. Chama <code>execve()</code>. Se execve falhar: escreve "Status: 500\r\n\r\n" no stdout e <code>_exit(1)</code>.</p>
+      <p><strong>Processo pai:</strong> fecha as pontas usadas pelo filho. Seta os pipes como non-blocking. Retorna a struct <code>CgiProcess</code>.</p>
+    </div>
+    <div class="chain">
+      <span class="fn">pipe(pipeIn) pipe(pipeOut)</span><span class="arr">→</span>
+      <span class="fn">buildEnvp()</span><span class="arr">→</span>
+      <span class="fn">open(tmpPath)</span><span class="arr">→</span>
+      <span class="fn yellow">fork()</span><span class="arr">→ filho →</span>
+      <span class="fn">dup2() execve()</span>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🌍</span><span class="flow-title">buildEnvp() — variáveis de ambiente para o CGI</span></div>
+    <div class="flow-body">
+      <p>Monta: REQUEST_METHOD, SERVER_PROTOCOL, PATH_INFO, GATEWAY_INTERFACE, REDIRECT_STATUS, SERVER_NAME, SCRIPT_FILENAME, CONTENT_LENGTH, CONTENT_TYPE, QUERY_STRING (extraída da URI após '?').</p>
+      <p>Para cada header da requisição (exceto Content-Type, Content-Length, Transfer-Encoding) adiciona <code>HTTP_NOME_HEADER=valor</code> — traços viram underscores, lowercase vira uppercase.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">💾</span><span class="flow-title">handleCgiRead() → arquivo temporário → finishCgi()</span><span class="flow-file">WebServ::handleCgiRead() + CgiHandler::finishCgi()</span></div>
+    <div class="flow-body">
+      <p><code>handleCgiRead()</code>: lê do pipeOut em chunks de 64KB e escreve no tmpFd. Acumula o total em <code>cgiTotalOutput</code>. Quando o read retorna 0 ou negativo (CGI fechou o pipe) → fecha o pipe → chama <code>finishCgi(clientFd)</code>.</p>
+      <p><code>finishCgi()</code>: faz waitpid bloqueante do processo CGI e verifica pelo status de saída se ele terminou bem ou crashou (sinal recebido ou código de saída diferente de zero) — se crashou, responde 500 direto, descartando qualquer saída parcial que o script tenha produzido. Senão, chama <code>CgiHandler::finishCgi(tmpFd, tmpPath, totalOutput)</code> que: fecha e reabre o tmp para leitura, lê os primeiros 8KB para encontrar os headers CGI (<code>Status:</code> e <code>Content-Type:</code>), calcula o offset onde começa o body, retorna <code>CgiResult</code>.</p>
+      <p>O <code>WebServ::finishCgi()</code> usa o <code>CgiResult</code> para chamar <code>client->setFileResponse()</code> com o arquivo tmp — o corpo da resposta é o tmp a partir do offset do body. O tmp é deletado quando o Client é destruído (<code>deleteFileOnClose=true</code>).</p>
+    </div>
+  </div>
+
+  <div class="why">A saída do CGI vai para um arquivo temporário (não para memória) para suportar respostas grandes sem estourar RAM. O arquivo é servido em chunks de 64KB pelo mesmo mecanismo de fileResponse que serve arquivos estáticos — reuso de código.</why>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="chapter" id="s6">
+  <div class="ch-head">
+    <span class="ch-num">06</span>
+    <span class="ch-title">Enviando a Resposta — handleClientWrite e Client</span>
+    <span class="ch-sub">WebServ::handleClientWrite → Client::getResponseData</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">📡</span><span class="flow-title">handleClientWrite() — o remetente</span><span class="flow-file">WebServ::handleClientWrite()</span></div>
+    <div class="flow-body">
+      <p><strong>Caso especial 100-Continue:</strong> se <code>sending100Continue == true</code> e a resposta terminou, reseta o estado e volta o fd para POLLIN — agora espera o body completo.</p>
+      <p><strong>Caso normal:</strong> verifica <code>getResponseRemaining()</code>. Chama <code>client->getResponseData(sendBuf, 65536)</code> para preencher o buffer de envio. Chama <code>send(clientFd, sendBuf, dataLen, 0)</code>. Se <code>send</code> retornar positivo → <code>advanceResponseOffset(bytesSent)</code>. Se a resposta completou → <code>removeClient()</code>. Se <code>send</code> retornar negativo → <code>removeClient()</code>.</p>
+    </div>
+    <div class="chain">
+      <span class="fn blue">handleClientWrite()</span><span class="arr">→</span>
+      <span class="fn orange">getResponseRemaining()</span><span class="arr">→</span>
+      <span class="fn orange">getResponseData(buf, 65536)</span><span class="arr">→</span>
+      <span class="fn">send()</span><span class="arr">→</span>
+      <span class="fn orange">advanceResponseOffset()</span><span class="arr">→ completo →</span>
+      <span class="fn red">removeClient()</span>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🗃</span><span class="flow-title">Client — dois modos de resposta</span><span class="flow-file">srcs/server/Client.cpp</span></div>
+    <div class="flow-body">
+      <p><strong>Modo buffer</strong> (<code>setResponse(string)</code>): toda a resposta (header + body) está em <code>responseBuffer</code>. <code>getResponseData()</code> simplesmente copia a partir de <code>responseSendOffset</code>.</p>
+      <p><strong>Modo arquivo</strong> (<code>setFileResponse(header, path, size)</code>): o header está em <code>responseBuffer</code>, o corpo está no arquivo em disco. <code>getResponseData()</code> primeiro esvazia o buffer do header, depois lê o arquivo em chunks de 64KB via <code>responseFileFd</code>. Isso evita carregar arquivos grandes na memória.</p>
+    </div>
+  </div>
+
+  <table class="states">
+    <thead><tr><th>Atributo</th><th>Quem seta</th><th>O que significa</th></tr></thead>
+    <tbody>
+      <tr><td>requestBuffer</td><td>appendRequest()</td><td>Acumula dados crus da rede</td></tr>
+      <tr><td>requestComplete</td><td>isRequestComplete()</td><td>Requisição inteira chegou</td></tr>
+      <tr><td>responseBuffer</td><td>setResponse() / setFileResponse()</td><td>Header e body em memória</td></tr>
+      <tr><td>responseSendOffset</td><td>advanceResponseOffset()</td><td>Quantos bytes já foram enviados</td></tr>
+      <tr><td>fileBasedResponse</td><td>setFileResponse()</td><td>Corpo está em arquivo, não em memória</td></tr>
+      <tr><td>responseFileFd</td><td>setFileResponse()</td><td>fd aberto do arquivo a servir</td></tr>
+      <tr><td>cgiRunning</td><td>handleClientRead()</td><td>Tem um processo CGI ativo para este cliente</td></tr>
+      <tr><td>cgiPid/pipeIn/pipeOut/tmpFd</td><td>handleClientRead()</td><td>Estado completo do CGI deste cliente</td></tr>
+      <tr><td>sending100Continue</td><td>handleClientRead()</td><td>Está enviando o 100-Continue agora</td></tr>
+    </tbody>
+  </table>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🧹</span><span class="flow-title">removeClient() — limpeza total</span><span class="flow-file">WebServ::removeClient()</span></div>
+    <div class="flow-body">
+      <p>Se o cliente tinha CGI ativo: remove pipeIn e pipeOut do <code>cgiPipeToClient</code> e do pollfds. Manda SIGKILL no processo CGI e faz waitpid para não deixar zumbi.</p>
+      <p>Chama <code>delete client</code> — o destrutor do Client fecha responseFileFd, deleta o arquivo tmp do CGI se existir, fecha pipes pendentes.</p>
+      <p>Remove de <code>clients</code>, chama <code>removePollFd(clientFd)</code>, fecha o fd do socket.</p>
+    </div>
+    <div class="chain">
+      <span class="fn red">removeClient()</span><span class="arr">→</span>
+      <span class="fn">remove pipes do cgiPipeToClient</span><span class="arr">→</span>
+      <span class="fn yellow">kill() + waitpid()</span><span class="arr">→</span>
+      <span class="fn orange">delete Client</span><span class="arr">→</span>
+      <span class="fn">removePollFd() + close(fd)</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="chapter" id="s7">
+  <div class="ch-head">
+    <span class="ch-num">07</span>
+    <span class="ch-title">Configuração em Detalhe — webserv.conf</span>
+    <span class="ch-sub">Como as configurações afetam o comportamento</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">📋</span><span class="flow-title">Hierarquia de configuração</span></div>
+    <div class="flow-body">
+      <p>Servidor global → define porta, server_name, root padrão, index padrão, client_max_body_size global, error_pages.</p>
+      <p>Cada location → pode sobrescrever root, index, client_max_body_size. Define seus próprios allow_methods, cgi_ext/cgi_path, autoindex, upload_store, redirect.</p>
+      <p>Em <code>generateResponse()</code>: <code>root = location.root se não vazio, senão server.root</code>. <code>maxBody = location.maxBody se > 0, senão server.maxBody</code>.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-title">webserv.conf real → comportamento gerado</div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box cyan">listen 8080</div><div class="dia-arrow">→</div><div class="dia-box">socket na porta 8080</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box cyan">location / → allow_methods GET + cgi_ext .bla → cgi_path ./cgi_tester</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box green">GET /index.html</div><div class="dia-arrow">→</div><div class="dia-box">casa location / → handleGet → www/index.html</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box green">GET /directory/youpi.bla</div><div class="dia-arrow">→</div><div class="dia-box purple">casa location /directory/ → .bla == cgi_ext → execve(./cgi_tester)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box green">GET /google</div><div class="dia-arrow">→</div><div class="dia-box yellow">location /google → redirect 302 → https://www.google.com</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box green">POST /cgi-bin/hello.py</div><div class="dia-arrow">→</div><div class="dia-box purple">location /cgi-bin/ → .py == cgi_ext → execve(/usr/bin/python3)</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box green">POST /post_body (body > 100 bytes)</div><div class="dia-arrow">→</div><div class="dia-box red">location /post_body → maxBody=100 → 413</div>
+    </div>
+    <div class="dia-row dia-wrap">
+      <div class="dia-box green">DELETE /uploads/arquivo.txt</div><div class="dia-arrow">→</div><div class="dia-box orange">location /uploads/ → allow DELETE → unlink(www/uploads/arquivo.txt)</div>
+    </div>
+  </div>
+
+  <div class="note"><strong>Seleção do servidor:</strong> <code>getServerForRequest()</code> recebe o <code>serverFd</code> — o socket de listen por onde aquela conexão entrou — e traduz para a porta real via <code>serverSockets</code>. Filtra os <code>ServerConfig</code> para apenas os que escutam naquela porta; só dentro desse subconjunto compara o header <code>Host</code> (sem a parte <code>:porta</code>) contra <code>server_name</code>. Se nenhum nome bater, usa o primeiro <code>ServerConfig</code> daquela porta. Como os dois servidores no conf têm <code>server_name localhost</code>, é a porta que decide qual config usar — o <code>Host</code> só desempata quando há mais de um server na mesma porta.</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="chapter" id="s8">
+  <div class="ch-head">
+    <span class="ch-num">08</span>
+    <span class="ch-title">Por Que Decisões — Resumo das Escolhas de Design</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🤔</span><span class="flow-title">poll() em vez de select() ou epoll()</span></div>
+    <div class="flow-body">
+      <p>poll() foi escolhido por ser portável (Linux e macOS), mais simples que epoll (sem epoll_create/ctl/wait), e sem a limitação de 1024 fds do select FD_SET. O subject permite qualquer um — poll() é o meio-termo ideal para um projeto acadêmico.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🤔</span><span class="flow-title">Arquivo temporário para saída do CGI</span></div>
+    <div class="flow-body">
+      <p>A saída do CGI pode ser grande. Guardar em memória (string) poderia estourar. O arquivo tmp em /tmp é criado com nome único (PID + time + contador) para evitar colisões entre múltiplos CGIs simultâneos. É deletado automaticamente no destrutor do Client. O mesmo mecanismo de fileResponse serve o tmp e arquivos estáticos — reuso.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🤔</span><span class="flow-title">break após cada handler no loop</span></div>
+    <div class="flow-body">
+      <p>Handlers modificam o vetor pollfds (add/remove). Continuar iterando sobre um vetor modificado seria undefined behavior. O break reinicia o for na próxima iteração do while com um vetor consistente. Custo: só processa um fd pronto por iteração — mas o poll com timeout 1000ms garante que voltamos rapidamente e processamos os outros.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🤔</span><span class="flow-title">Connection: close em todas as respostas</span></div>
+    <div class="flow-body">
+      <p>Keep-alive exigiria rastrear quando uma conexão está ociosa e reutilizá-la para múltiplas requisições — complexidade extra. Connection: close simplifica: cada requisição tem seu próprio ciclo de vida. O cliente sempre sabe que pode fechar a conexão após receber a resposta. Para o siege, o overhead de reconectar é pequeno comparado ao custo de implementar keep-alive corretamente.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🤔</span><span class="flow-title">Sessions em memória (map no WebServ)</span></div>
+    <div class="flow-body">
+      <p>Para o bônus de cookies/sessão, um map em memória (<code>sessions</code> em WebServ) é a solução mais simples. A referência é passada para <code>generateResponse()</code>. Desvantagem: as sessões somem se o servidor reinicia. Mas para demonstrar o bônus é suficiente — e é exatamente o que o subject pede ("forneça exemplos simples").</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-icon">🤔</span><span class="flow-title">Por que HttpResponse seta needsCgi e não executa o CGI</span></div>
+    <div class="flow-body">
+      <p>HttpResponse não tem acesso ao pollfds, ao map de clients, nem ao cgiPipeToClient. Misturar lógica de rede com geração de resposta HTTP quebraria a separação de responsabilidades. O WebServ lê o flag needsCgi e toma a ação correta — quem sabe de rede é o WebServ, quem sabe de HTTP é o HttpResponse.</p>
+    </div>
+  </div>
+
+</div>
+
+</div><!-- /page -->
+</body>
+</html>
