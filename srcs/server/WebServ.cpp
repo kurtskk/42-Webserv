@@ -13,6 +13,7 @@
 #include <cstring>
 #include <sstream>
 #include <signal.h>
+#include <errno.h>
 
 bool WebServ::isRunning = true;
 
@@ -98,7 +99,6 @@ void WebServ::run() {
 				setPollEvent(clientFd, POLLOUT);
 				client->cgiRunning = false;
 				client->cgiPid = -1;
-				if (client->cgiPipeIn != -1) { close(client->cgiPipeIn); client->cgiPipeIn = -1; }
 				if (client->cgiPipeOut != -1) { close(client->cgiPipeOut); client->cgiPipeOut = -1; }
 				if (client->cgiTmpFd != -1) { close(client->cgiTmpFd); client->cgiTmpFd = -1; }
 				std::map<int, int>::iterator pipeIt = cgiPipeToClient.begin();
@@ -135,11 +135,6 @@ void WebServ::run() {
 				if (fd == client->cgiPipeOut) {
 					if (pollfds[i].revents & (POLLIN | POLLHUP | POLLERR)) {
 						handleCgiRead(fd);
-					}
-				}
-				else if (fd == client->cgiPipeIn) {
-					if (pollfds[i].revents & (POLLOUT | POLLERR | POLLHUP)) {
-						handleCgiWrite(fd);
 					}
 				}
 			}
@@ -205,9 +200,12 @@ void WebServ::handleClientRead(int clientFd) {
 			}
 			HttpResponse res;
 			const ServerConfig &server = getServerForRequest(req, client->getServerFd());
-			res.generateResponse(req, server, this->sessions);
+			std::string reqBodyPathStr = client->getReqTmpPath() ? client->getReqTmpPath() : "";
+			res.generateResponse(req, server, this->sessions, reqBodyPathStr, client->getReqBodyWritten());
 			if (res.needsCgiExec()) {
-				CgiProcess proc = CgiHandler::startCgi(res.getCgiExecPath(), res.getCgiScriptPath(), req);
+				size_t bodySize = client->getReqBodyWritten();
+				std::string reqBodyPath = client->getReqTmpPath() ? client->getReqTmpPath() : "";
+				CgiProcess proc = CgiHandler::startCgi(res.getCgiExecPath(), res.getCgiScriptPath(), req, reqBodyPath, bodySize);
 				if (!proc.valid) {
 					HttpResponse errRes;
 					client->setResponse(errRes.getErrorResponse(500));
@@ -216,23 +214,11 @@ void WebServ::handleClientRead(int clientFd) {
 				}
 				client->cgiRunning = true;
 				client->cgiPid = proc.pid;
-				client->cgiPipeIn = proc.pipeIn;
 				client->cgiPipeOut = proc.pipeOut;
 				client->cgiTmpFd = proc.tmpFd;
-				client->cgiStartTime = time(NULL);
+				client->cgiStartTime = SocketUtils::getCurrentTime();
 				std::memcpy(client->cgiTmpPath, proc.tmpPath, sizeof(proc.tmpPath));
-				client->cgiBody = req.getBody();
-				client->cgiBodyWritten = 0;
 				client->cgiTotalOutput = 0;
-				client->cgiBodyDone = client->cgiBody.empty();
-				if (client->cgiBodyDone) {
-					close(client->cgiPipeIn);
-					client->cgiPipeIn = -1;
-				}
-				else {
-					cgiPipeToClient[client->cgiPipeIn] = clientFd;
-					addPollFd(client->cgiPipeIn, POLLOUT);
-				}
 				cgiPipeToClient[client->cgiPipeOut] = clientFd;
 				addPollFd(client->cgiPipeOut, POLLIN);
 			}
@@ -250,35 +236,11 @@ void WebServ::handleClientRead(int clientFd) {
 	}
 	else if (bytesRead == 0)
 		removeClient(clientFd);
-	else if (bytesRead < 0)
+	else if (bytesRead < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
 		removeClient(clientFd);
 }
 
-void WebServ::handleCgiWrite(int pipeFd) {
-	int clientFd = cgiPipeToClient[pipeFd];
-	Client *client = clients[clientFd];
-	const std::string &body = client->cgiBody;
-	size_t remaining = body.length() - client->cgiBodyWritten;
-	size_t chunkSize = remaining > 65536 ? 65536 : remaining;
-	ssize_t n = write(pipeFd, body.c_str() + client->cgiBodyWritten, chunkSize);
-	if (n > 0) {
-		client->cgiBodyWritten += n;
-		if (client->cgiBodyWritten >= body.length()) {
-			cgiPipeToClient.erase(pipeFd);
-			removePollFd(pipeFd);
-			close(pipeFd);
-			client->cgiPipeIn = -1;
-			client->cgiBodyDone = true;
-		}
-	}
-	else if (n < 0) {
-		cgiPipeToClient.erase(pipeFd);
-		removePollFd(pipeFd);
-		close(pipeFd);
-		client->cgiPipeIn = -1;
-		client->cgiBodyDone = true;
-	}
-}
+
 
 void WebServ::handleCgiRead(int pipeFd) {
 	int clientFd = cgiPipeToClient[pipeFd];
@@ -290,7 +252,7 @@ void WebServ::handleCgiRead(int pipeFd) {
 		if (w > 0)
 			client->cgiTotalOutput += w;
 	}
-	else {
+	else if (bytesRead == 0 || (bytesRead < 0 && errno != EAGAIN && errno != EWOULDBLOCK)) {
 		cgiPipeToClient.erase(pipeFd);
 		removePollFd(pipeFd);
 		close(pipeFd);
@@ -365,7 +327,7 @@ void WebServ::handleClientWrite(int clientFd) {
 				removeClient(clientFd);
 		}
 	}
-	else if (bytesSent < 0)
+	else if (bytesSent < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
 		removeClient(clientFd);
 }
 
@@ -373,10 +335,6 @@ void WebServ::removeClient(int clientFd) {
 	std::map<int, Client *>::iterator it = clients.find(clientFd);
 	if (it != clients.end()) {
 		Client *client = it->second;
-		if (client->cgiPipeIn >= 0) {
-			cgiPipeToClient.erase(client->cgiPipeIn);
-			removePollFd(client->cgiPipeIn);
-		}
 		if (client->cgiPipeOut >= 0) {
 			cgiPipeToClient.erase(client->cgiPipeOut);
 			removePollFd(client->cgiPipeOut);

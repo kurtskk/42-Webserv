@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "CgiHandler.hpp"
 #include <unistd.h>
 #include <sys/wait.h>
@@ -27,8 +28,7 @@ static bool pushEnv(std::vector<char *> &envp, const std::string &str) {
 	return (true);
 }
 
-void CgiHandler::buildEnvp(const HttpRequest &req, const std::string &scriptFile, std::vector<char *> &envp) {
-	const std::string &body = req.getBody();
+void CgiHandler::buildEnvp(const HttpRequest &req, const std::string &scriptFile, std::vector<char *> &envp, size_t bodySize) {
 	std::string methodEnv     = "REQUEST_METHOD=" + req.getMethod();
 	std::string protocolEnv   = "SERVER_PROTOCOL=HTTP/1.1";
 	std::string pathInfoEnv   = "PATH_INFO=" + req.getUri();
@@ -37,7 +37,7 @@ void CgiHandler::buildEnvp(const HttpRequest &req, const std::string &scriptFile
 	std::string serverNameEnv = "SERVER_NAME=localhost";
 	std::string scriptNameEnv = "SCRIPT_FILENAME=" + scriptFile;
 	std::ostringstream cl;
-	cl << "CONTENT_LENGTH=" << body.length();
+	cl << "CONTENT_LENGTH=" << bodySize;
 	std::string contentLengthEnv = cl.str();
 	std::string contentTypeEnv = "CONTENT_TYPE=application/octet-stream";
 	const std::map<std::string, std::string> &headers = req.getHeaders();
@@ -84,22 +84,19 @@ void CgiHandler::buildEnvp(const HttpRequest &req, const std::string &scriptFile
 }
 
 CgiProcess CgiHandler::startCgi(const std::string &cgiPath, const std::string &scriptFile,
-	const HttpRequest &req) {
+	const HttpRequest &req, const std::string &reqBodyPath, size_t bodySize) {
 	CgiProcess proc;
 	proc.valid = false;
 	proc.pid = -1;
-	proc.pipeIn = -1;
 	proc.pipeOut = -1;
 	proc.tmpFd = -1;
 	std::memset(proc.tmpPath, 0, sizeof(proc.tmpPath));
-	int pipeIn[2];
 	int pipeOut[2];
-	if (pipe(pipeIn) < 0 || pipe(pipeOut) < 0)
+	if (pipe(pipeOut) < 0)
 		return proc;
 	std::vector<char *> envp;
-	buildEnvp(req, scriptFile, envp);
+	buildEnvp(req, scriptFile, envp, bodySize);
 	if (envp.empty()) {
-		close(pipeIn[0]); close(pipeIn[1]);
 		close(pipeOut[0]); close(pipeOut[1]);
 		return (proc);
 	}
@@ -107,31 +104,36 @@ CgiProcess CgiHandler::startCgi(const std::string &cgiPath, const std::string &s
 		static unsigned int tmpCounter = 0;
 		++tmpCounter;
 		std::ostringstream tmpName;
-		tmpName << "/tmp/webserv_cgi_" << getpid() << "_" << static_cast<long>(time(NULL)) << "_" << tmpCounter;
+		tmpName << "/tmp/webserv_cgi_" << static_cast<const void*>(&proc) << "_" << static_cast<long>(SocketUtils::getCurrentTime()) << "_" << tmpCounter;
 		std::strncpy(proc.tmpPath, tmpName.str().c_str(), sizeof(proc.tmpPath) - 1);
 	}
 	proc.tmpFd = open(proc.tmpPath, O_RDWR | O_CREAT | O_EXCL, 0600);
 	if (proc.tmpFd < 0) {
-		close(pipeIn[0]); close(pipeIn[1]);
 		close(pipeOut[0]); close(pipeOut[1]);
 		freeEnvp(envp);
 		return (proc);
 	}
 	pid_t pid = fork();
 	if (pid < 0) {
-		close(pipeIn[0]); close(pipeIn[1]);
 		close(pipeOut[0]); close(pipeOut[1]);
 		close(proc.tmpFd);
-		unlink(proc.tmpPath);
+		std::remove(proc.tmpPath);
 		freeEnvp(envp);
 		return (proc);
 	}
 	if (pid == 0) {
-		close(pipeIn[1]);
 		close(pipeOut[0]);
-		dup2(pipeIn[0], STDIN_FILENO);
+
+		int bodyFd = -1;
+		if (!reqBodyPath.empty()) {
+			bodyFd = open(reqBodyPath.c_str(), O_RDONLY);
+			if (bodyFd >= 0) {
+				dup2(bodyFd, STDIN_FILENO);
+				close(bodyFd);
+			}
+		}
+
 		dup2(pipeOut[1], STDOUT_FILENO);
-		close(pipeIn[0]);
 		close(pipeOut[1]);
 		char *arg0 = new char[cgiPath.length() + 1];
 		std::strcpy(arg0, cgiPath.c_str());
@@ -145,13 +147,10 @@ CgiProcess CgiHandler::startCgi(const std::string &cgiPath, const std::string &s
 		freeEnvp(envp);
 		_exit(1);
 	}
-	close(pipeIn[0]);
 	close(pipeOut[1]);
 	freeEnvp(envp);
-	fcntl(pipeIn[1], F_SETFL, O_NONBLOCK);
 	fcntl(pipeOut[0], F_SETFL, O_NONBLOCK);
 	proc.pid = pid;
-	proc.pipeIn = pipeIn[1];
 	proc.pipeOut = pipeOut[0];
 	proc.valid = true;
 	return (proc);

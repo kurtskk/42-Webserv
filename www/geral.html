@@ -135,17 +135,17 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
   </div>
 
   <div class="flow">
-    <div class="flow-head"><span class="flow-icon">🏗</span><span class="flow-title">As 6 classes do projeto</span></div>
+    <div class="flow-head"><span class="flow-icon">🏗</span><span class="flow-title">As 9 classes do projeto</span></div>
     <div class="flow-body">
       <p><strong style="color:var(--green)">Config</strong> → lê e valida o webserv.conf. Produz uma lista de <strong style="color:var(--blue)">ServerConfig</strong>.</p>
-      <p><strong style="color:var(--blue)">ServerConfig</strong> → representa um bloco <code>server {}</code>. Guarda porta, nome, error_pages, body_size e uma lista de <strong style="color:var(--cyan)">LocationConfig</strong>.</p>
-      <p><strong style="color:var(--cyan)">LocationConfig</strong> → representa um bloco <code>location {}</code>. Guarda root, métodos, CGI, redirect, autoindex, upload_store.</p>
-      <p><strong style="color:var(--yellow)">WebServ</strong> → o motor. Tem o loop com poll(), aceita conexões, despacha leitura/escrita, gerencia CGI.</p>
-      <p><strong style="color:var(--orange)">Client</strong> → representa uma conexão aberta. Acumula o buffer de requisição, guarda o estado da resposta e os fds do CGI.</p>
-      <p><strong style="color:var(--purple)">HttpRequest</strong> → parse do texto cru da requisição. Produz método, URI, headers, body.</p>
-      <p><strong style="color:var(--red)">HttpResponse</strong> → gera a resposta. Decide se é arquivo, redirect, CGI ou erro. Constrói o header HTTP.</p>
-      <p><strong style="color:var(--muted2)">CgiHandler</strong> → faz fork+pipe+execve. Monta as variáveis de ambiente do CGI.</p>
-      <p><strong style="color:var(--muted2)">SocketUtils</strong> → helper estático. Cria socket TCP, faz bind/listen, seta O_NONBLOCK.</p>
+      <p><strong style="color:var(--blue)">ServerConfig</strong> → representa um bloco <code>server {}</code>. Guarda porta, nome, error_pages, client_max_body_size e uma lista de <strong style="color:var(--cyan)">LocationConfig</strong>.</p>
+      <p><strong style="color:var(--cyan)">LocationConfig</strong> → representa um bloco <code>location {}</code>. Guarda root, index, métodos, CGI (ext+path), redirect, autoindex, upload_store, client_max_body_size.</p>
+      <p><strong style="color:var(--yellow)">WebServ</strong> → o motor. Tem o loop com poll(), aceita conexões, despacha leitura/escrita, gerencia CGI. Mantém o mapa de sessões.</p>
+      <p><strong style="color:var(--orange)">Client</strong> → representa uma conexão aberta. Acumula headers no buffer e body em arquivo temporário (<code>reqTmpFd</code>). Guarda o estado da resposta e os fds do CGI.</p>
+      <p><strong style="color:var(--purple)">HttpRequest</strong> → parse do texto cru da requisição (headers + request line). Produz método, URI, versão, headers.</p>
+      <p><strong style="color:var(--red)">HttpResponse</strong> → gera a resposta. Decide se é arquivo, redirect, CGI ou erro. Constrói o header HTTP. Implementa sessões.</p>
+      <p><strong style="color:var(--muted2)">CgiHandler</strong> → faz fork+execve. Alimenta o CGI com o body via arquivo tmp (stdin redirecionado). Lê saída via pipe. Monta variáveis de ambiente.</p>
+      <p><strong style="color:var(--muted2)">SocketUtils</strong> → helper estático. Cria socket TCP, faz bind/listen, seta O_NONBLOCK, aumenta SO_RCVBUF/SO_SNDBUF.</p>
     </div>
   </div>
 
@@ -175,9 +175,9 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
       <div class="dia-box red">HttpResponse::generateResponse</div>
     </div>
     <div class="dia-row dia-wrap">
-      <div class="dia-box red">HttpResponse</div>
-      <div class="dia-arrow">→ se CGI →</div>
-      <div class="dia-box">CgiHandler::startCgi</div>
+      <div class="dia-box red">HttpResponse seta needsCgi=true</div>
+      <div class="dia-arrow">→ WebServ chama →</div>
+      <div class="dia-box">CgiHandler::startCgi(bodyTmpFile)</div>
       <div class="dia-arrow">→ fork+execve →</div>
       <div class="dia-box">processo filho</div>
     </div>
@@ -197,13 +197,13 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
   <div class="flow">
     <div class="flow-head"><span class="flow-icon">1️⃣</span><span class="flow-title">main() — ponto de entrada</span><span class="flow-file">srcs/main.cpp</span></div>
     <div class="flow-body">
-      <p>Registra o handler de SIGINT (<code>WebServ::signalHandler</code>) que seta <code>isRunning = false</code> — o loop para limpo.</p>
+      <p>Registra o handler de SIGINT (<code>WebServ::signalHandler</code>) que seta <code>isRunning = false</code> — o loop para limpo. Também ignora SIGPIPE (<code>signal(SIGPIPE, SIG_IGN)</code>) para não crashar ao escrever em socket fechado.</p>
       <p>Valida que argc == 2. Cria <code>Config</code>, chama <code>config.load(argv[1])</code>. Cria <code>WebServ</code> com a config. Chama <code>setupServers()</code>. Chama <code>run()</code>.</p>
       <p>Tudo dentro de try/catch — qualquer exceção lançada no startup imprime o erro e retorna 1.</p>
     </div>
     <div class="chain">
       <span class="fn">main()</span><span class="arr">→</span>
-      <span class="fn yellow">signal(SIGINT)</span><span class="arr">→</span>
+      <span class="fn yellow">signal(SIGINT) + SIG_IGN(SIGPIPE)</span><span class="arr">→</span>
       <span class="fn">Config::load()</span><span class="arr">→</span>
       <span class="fn">WebServ::setupServers()</span><span class="arr">→</span>
       <span class="fn">WebServ::run()</span>
@@ -257,9 +257,10 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
   <div class="flow">
     <div class="flow-head"><span class="flow-icon">🔁</span><span class="flow-title">O coração do servidor — while(isRunning)</span><span class="flow-file">WebServ::run()</span></div>
     <div class="flow-body">
-      <p>O loop tem duas fases por iteração:</p>
-      <p><strong style="color:var(--yellow)">Fase 1 — Timeout de CGI:</strong> antes de processar revents, itera sobre todos os clientes e verifica <code>isCgiTimedOut()</code>. Se ultrapassou 120s → mata o processo (<code>kill(SIGKILL)</code> + <code>waitpid</code>) → prepara resposta 504 → coloca o fd do cliente em POLLOUT.</p>
-      <p><strong style="color:var(--blue)">Fase 2 — Processar revents:</strong> itera sobre o array pollfds. Categoriza cada fd pronto em 3 tipos e despacha para o handler correto. Após cada handler chama <code>break</code> — só processa um fd pronto por iteração do loop.</p>
+      <p>O loop tem três fases por iteração:</p>
+      <p><strong style="color:var(--muted2)">Fase 0 — Limpeza do pollfds:</strong> antes do poll(), remove entradas com fd == -1 (fds marcados como removidos pelos handlers anteriores).</p>
+      <p><strong style="color:var(--yellow)">Fase 1 — Timeout de CGI:</strong> itera sobre todos os clientes e verifica <code>isCgiTimedOut()</code>. Se ultrapassou <strong>30s</strong> → mata o processo (<code>kill(SIGKILL)</code> + <code>waitpid</code>) → fecha pipes e tmp → prepara resposta 504 → coloca o fd do cliente em POLLOUT.</p>
+      <p><strong style="color:var(--blue)">Fase 2 — Processar revents:</strong> itera sobre o array pollfds. Categoriza cada fd pronto em tipos e despacha para o handler correto. Não usa break — itera sobre todos os fds prontos de uma vez (o tamanho do loop é capturado antes em <code>size_t size = pollfds.size()</code>).</p>
     </div>
   </div>
 
@@ -268,17 +269,12 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
     <div class="dia-row dia-wrap">
       <div class="dia-box yellow">fd pronto</div>
       <div class="dia-arrow">→ está em serverSockets? →</div>
-      <div class="dia-box green">SIM → acceptNewConnection(fd)</div>
+      <div class="dia-box green">SIM + POLLIN → acceptNewConnection(fd)</div>
     </div>
     <div class="dia-row dia-wrap">
       <div class="dia-box yellow">fd pronto</div>
       <div class="dia-arrow">→ está em cgiPipeToClient? →</div>
-      <div class="dia-box purple">SIM + POLLIN → handleCgiRead(fd)</div>
-    </div>
-    <div class="dia-row dia-wrap">
-      <div class="dia-box" style="opacity:0;width:5rem"></div>
-      <div class="dia-arrow" style="opacity:0">→</div>
-      <div class="dia-box purple">SIM + POLLOUT → handleCgiWrite(fd)</div>
+      <div class="dia-box purple">SIM (fd == cgiPipeOut) + POLLIN|HUP|ERR → handleCgiRead(fd)</div>
     </div>
     <div class="dia-row dia-wrap">
       <div class="dia-box yellow">fd pronto</div>
@@ -293,13 +289,15 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
     <div class="dia-row dia-wrap">
       <div class="dia-box" style="opacity:0;width:5rem"></div>
       <div class="dia-arrow" style="opacity:0">→</div>
-      <div class="dia-box red">POLLERR/HUP → removeClient(fd)</div>
+      <div class="dia-box red">POLLERR/HUP/NVAL → removeClient(fd)</div>
     </div>
   </div>
 
-  <div class="note"><strong>Por que o break?</strong> O array pollfds pode ser modificado pelos handlers (addPollFd, removePollFd). Iterar sobre um vector que mudou seria UB. O break reinicia o loop com o array atualizado — seguro e simples.</div>
+  <div class="note"><strong>Sem break após handlers:</strong> o loop usa um índice fixo (<code>size_t size = pollfds.size()</code> capturado antes de iterar) e marca fds removidos com <code>fd = -1</code> em vez de erase imediato — assim pode processar múltiplos fds prontos por iteração do while sem UB.</div>
 
-  <div class="why">Só um poll() no loop inteiro porque o subject exige isso. Ter dois poll() (um para listen, outro para clientes) violaria a regra e tiraria 0. O design de ter o array pollfds como vetor dinâmico permite adicionar/remover fds (novos clientes, pipes de CGI) sem precisar de múltiplos selects.</why>
+  <div class="note"><strong>Sem handleCgiWrite:</strong> o body da requisição é escrito em arquivo temporário (<code>reqTmpPath</code>) pelo Client antes do CGI ser lançado. O processo filho recebe esse arquivo via stdin (<code>dup2(bodyFd, STDIN_FILENO)</code>). Não existe mais pipe de entrada para o CGI — apenas um pipe de saída (<code>cgiPipeOut</code>).</div>
+
+  <div class="why">Só um poll() no loop inteiro porque o subject exige isso. O design de marcar fds com -1 em vez de erase imediato permite ao loop processar múltiplos eventos por ciclo sem invalidar iteradores.</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════ -->
@@ -328,20 +326,21 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
   <div class="flow">
     <div class="flow-head"><span class="flow-icon">📥</span><span class="flow-title">handleClientRead() — dados chegando</span><span class="flow-file">WebServ::handleClientRead()</span></div>
     <div class="flow-body">
-      <p><strong>1.</strong> Chama <code>recv(clientFd, buffer, 65536, 0)</code>. Se retornar 0 → cliente fechou → <code>removeClient()</code>. Se negativo → erro → também <code>removeClient()</code>.</p>
-      <p><strong>2.</strong> Se dados chegaram: <code>client->appendRequest(buffer, bytesRead)</code> — acumula no <code>requestBuffer</code> do Client.</p>
+      <p><strong>1.</strong> Chama <code>recv(clientFd, buffer, 65536, 0)</code>. Se retornar 0 → cliente fechou → <code>removeClient()</code>. Se negativo com errno != EAGAIN → erro → <code>removeClient()</code>.</p>
+      <p><strong>2.</strong> Se dados chegaram: <code>client->appendRequest(buffer, bytesRead)</code> — acumula headers no <code>requestBuffer</code> e body em arquivo temporário (<code>reqTmpFd</code>).</p>
       <p><strong>3.</strong> Chama <code>client->isRequestComplete()</code> para verificar se já temos a requisição inteira.</p>
       <p><strong>4.</strong> Verifica tamanho: <code>client->isRequestTooLarge(maxBody)</code> — se passou do limite → resposta 413 → POLLOUT.</p>
-      <p><strong>5.</strong> Verifica Expect: 100-continue — se o cliente avisou que vai mandar um body grande, enviamos <code>HTTP/1.1 100 Continue</code> primeiro.</p>
-      <p><strong>6.</strong> Se a requisição está completa → constrói <code>HttpRequest</code> → chama <code>HttpResponse::generateResponse()</code>.</p>
+      <p><strong>5.</strong> Verifica Expect: 100-continue — se <code>isHeadersParsed() &amp;&amp; getNeeds100Continue() &amp;&amp; !getHasSent100Continue()</code> e a requisição ainda não está completa → envia <code>HTTP/1.1 100 Continue</code> e seta <code>sending100Continue = true</code>.</p>
+      <p><strong>6.</strong> Se a requisição está completa → constrói <code>HttpRequest</code> (a partir do <code>requestBuffer</code> que contém apenas os headers) → chama <code>HttpResponse::generateResponse(req, server, sessions, reqTmpPath, reqBodyWritten)</code>. Passa o caminho do arquivo tmp com o body.</p>
+      <p><strong>7.</strong> Se <code>res.needsCgiExec()</code> → chama <code>CgiHandler::startCgi()</code> passando o arquivo tmp do body como stdin do CGI. Registra <code>cgiPipeOut</code> no pollfds com POLLIN.</p>
     </div>
     <div class="chain">
       <span class="fn">recv()</span><span class="arr">→</span>
       <span class="fn orange">appendRequest()</span><span class="arr">→</span>
       <span class="fn orange">isRequestComplete()</span><span class="arr">→</span>
       <span class="fn orange">isRequestTooLarge()</span><span class="arr">→</span>
-      <span class="fn purple">new HttpRequest(buffer)</span><span class="arr">→</span>
-      <span class="fn red">generateResponse()</span>
+      <span class="fn purple">HttpRequest(requestBuffer)</span><span class="arr">→</span>
+      <span class="fn red">generateResponse(reqTmpPath)</span>
     </div>
   </div>
 
@@ -349,16 +348,17 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
     <div class="flow-head"><span class="flow-icon">🔍</span><span class="flow-title">Client::isRequestComplete() — quando parar de acumular?</span><span class="flow-file">srcs/server/Client.cpp</span></div>
     <div class="flow-body">
       <p>Primeiro verifica se já encontrou <code>\r\n\r\n</code> (fim dos headers). Se não, ainda não temos nem os headers — retorna false.</p>
-      <p>Quando os headers chegaram: lê <code>Content-Length</code> e verifica se o buffer tem headers + body completos. Se sim → requisição completa.</p>
-      <p>Se for <code>Transfer-Encoding: chunked</code>: espera <code>0\r\n\r\n</code> no final do buffer — sinal de fim do chunked.</p>
-      <p>Se não tem Content-Length nem chunked → requisição sem body → completa ao receber os headers.</p>
-      <p>Também detecta o header <code>Expect: 100-continue</code> — seta <code>needs100Continue = true</code>.</p>
+      <p>Quando os headers chegaram (<code>headersParsed = true</code>): lê <code>Content-Length</code> e <code>Transfer-Encoding: chunked</code>. Se há body: abre um arquivo temporário (<code>/tmp/webserv_req_PID_TIME_N</code>) e escreve nele o body inicial que veio junto com os headers. Dados subsequentes de <code>appendRequest()</code> vão direto para esse arquivo — <strong>não ficam em memória</strong>.</p>
+      <p>Se Content-Length: requisição completa quando <code>reqBodyWritten >= contentLength</code>.</p>
+      <p>Se chunked: o parser <code>processChunkedBody()</code> decodifica os chunks em tempo real e escreve no arquivo tmp. Completo quando chunk de tamanho 0 é encontrado (<code>requestComplete = true</code>).</p>
+      <p>Se não há body: requisição completa ao receber os headers.</p>
+      <p>Detecta o header <code>Expect: 100-continue</code> → seta <code>needs100Continue = true</code>.</p>
     </div>
     <div class="chain">
       <span class="fn orange">isRequestComplete()</span><span class="arr">→ busca →</span>
-      <span class="fn">\r\n\r\n</span><span class="arr">→ lê →</span>
-      <span class="fn">Content-Length</span><span class="arr">→ ou →</span>
-      <span class="fn">chunked 0\r\n\r\n</span>
+      <span class="fn">\r\n\r\n</span><span class="arr">→ abre →</span>
+      <span class="fn">reqTmpFd</span><span class="arr">→ escreve body →</span>
+      <span class="fn">reqBodyWritten >= contentLength</span>
     </div>
   </div>
 
@@ -382,7 +382,7 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
     </div>
   </div>
 
-  <div class="why">O Client acumula dados em vez de parsear na hora porque TCP pode fragmentar — a requisição pode chegar em vários pacotes. Só quando isRequestComplete() confirma que temos tudo é que construímos o HttpRequest. Assim garantimos que o parse sempre recebe dados completos.</why>
+  <div class="why">O Client acumula dados em vez de parsear na hora porque TCP pode fragmentar — a requisição pode chegar em vários pacotes. Só quando isRequestComplete() confirma que temos tudo é que construímos o HttpRequest. Assim garantimos que o parse sempre recebe dados completos.</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════ -->
@@ -496,7 +496,7 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
     </div>
   </div>
 
-  <div class="why">A decisão de CGI acontece em generateResponse() — ela apenas seta needsCgi=true e retorna string vazia. Quem de fato executa o CGI é o WebServ::handleClientRead() que chama CgiHandler::startCgi() logo depois. Separar "decidir" de "executar" mantém HttpResponse sem dependências de sistema (sem fork, sem pipes).</why>
+  <div class="why">A decisão de CGI acontece em generateResponse() — ela apenas seta needsCgi=true e retorna string vazia. Quem de fato executa o CGI é o WebServ::handleClientRead() que chama CgiHandler::startCgi() logo depois. Separar "decidir" de "executar" mantém HttpResponse sem dependências de sistema (sem fork, sem pipes).</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════ -->
@@ -510,7 +510,8 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
   <div class="flow">
     <div class="flow-head"><span class="flow-icon">⚙️</span><span class="flow-title">O ciclo completo do CGI</span></div>
     <div class="flow-body">
-      <p>O CGI tem 4 fases: <strong>1)</strong> startCgi (fork+pipe), <strong>2)</strong> escrita do body ao CGI (handleCgiWrite), <strong>3)</strong> leitura da saída do CGI (handleCgiRead), <strong>4)</strong> finishCgi (parse do output e envio ao cliente).</p>
+      <p>O CGI tem 3 fases: <strong>1)</strong> startCgi (fork+pipe — body já está em arquivo tmp), <strong>2)</strong> leitura da saída do CGI via pipe (handleCgiRead → escreve em cgiTmpFd), <strong>3)</strong> finishCgi (waitpid, parse do output CGI, envio ao cliente).</p>
+      <p><strong>Não existe handleCgiWrite</strong>: o body da requisição foi acumulado em <code>reqTmpPath</code> pelo Client. O filho CGI o recebe via stdin (dup2 do arquivo).</p>
     </div>
   </div>
 
@@ -519,58 +520,53 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
     <div class="dia-row dia-wrap">
       <div class="dia-box blue">handleClientRead detecta needsCgi=true</div>
       <div class="dia-arrow">→</div>
-      <div class="dia-box">CgiHandler::startCgi()</div>
+      <div class="dia-box">CgiHandler::startCgi(reqTmpPath, bodySize)</div>
     </div>
     <div class="dia-row dia-wrap">
       <div class="dia-box">startCgi()</div>
       <div class="dia-arrow">→ fork() →</div>
-      <div class="dia-box green">filho: dup2+execve(python3 script.py)</div>
+      <div class="dia-box green">filho: dup2(reqTmpFd, STDIN) + dup2(pipeOut[1], STDOUT) + execve</div>
     </div>
     <div class="dia-row dia-wrap">
       <div class="dia-box">startCgi()</div>
       <div class="dia-arrow">→ pai retorna →</div>
-      <div class="dia-box orange">CgiProcess{pid, pipeIn, pipeOut, tmpFd}</div>
+      <div class="dia-box orange">CgiProcess{pid, pipeOut, tmpFd, tmpPath}</div>
     </div>
     <div class="dia-row dia-wrap">
       <div class="dia-box blue">handleClientRead salva proc no Client</div>
       <div class="dia-arrow">→</div>
-      <div class="dia-box purple">addPollFd(pipeIn, POLLOUT) + addPollFd(pipeOut, POLLIN)</div>
+      <div class="dia-box purple">addPollFd(cgiPipeOut, POLLIN)</div>
     </div>
     <div class="dia-row dia-wrap">
-      <div class="dia-box purple">poll detecta pipeIn POLLOUT</div>
+      <div class="dia-box purple">poll detecta cgiPipeOut POLLIN|HUP|ERR</div>
       <div class="dia-arrow">→</div>
-      <div class="dia-box">handleCgiWrite() → write(body ao CGI)</div>
+      <div class="dia-box">handleCgiRead() → read(pipe) → write(cgiTmpFd)</div>
     </div>
     <div class="dia-row dia-wrap">
-      <div class="dia-box purple">poll detecta pipeOut POLLIN</div>
+      <div class="dia-box purple">read() retorna 0 (CGI fechou pipe)</div>
       <div class="dia-arrow">→</div>
-      <div class="dia-box">handleCgiRead() → read() → write(tmpFd)</div>
+      <div class="dia-box yellow">finishCgi() → waitpid → CgiHandler::finishCgi(tmpFd) → parse headers</div>
     </div>
     <div class="dia-row dia-wrap">
-      <div class="dia-box purple">pipeOut fecha (CGI terminou)</div>
+      <div class="dia-box yellow">client.setFileResponse(header, cgiTmpPath, bodySize, offset, deleteOnClose=true)</div>
       <div class="dia-arrow">→</div>
-      <div class="dia-box yellow">finishCgi() → parse header CGI → client.setFileResponse(tmp)</div>
-    </div>
-    <div class="dia-row dia-wrap">
-      <div class="dia-box yellow">setPollEvent(clientFd, POLLOUT)</div>
-      <div class="dia-arrow">→</div>
-      <div class="dia-box green">handleClientWrite envia resposta ao browser</div>
+      <div class="dia-box green">setPollEvent(clientFd, POLLOUT) → handleClientWrite</div>
     </div>
   </div>
 
   <div class="flow">
     <div class="flow-head"><span class="flow-icon">🍴</span><span class="flow-title">CgiHandler::startCgi() — o fork</span><span class="flow-file">srcs/http/CgiHandler.cpp</span></div>
     <div class="flow-body">
-      <p><strong>Antes do fork:</strong> cria dois pipes (<code>pipeIn[2]</code> e <code>pipeOut[2]</code>). Chama <code>buildEnvp()</code> para montar as variáveis de ambiente. Cria arquivo temporário <code>/tmp/webserv_cgi_PID_TIME_COUNTER</code> para guardar a saída do CGI.</p>
-      <p><strong>Processo filho (pid==0):</strong> fecha as pontas desnecessárias dos pipes. <code>dup2(pipeIn[0], STDIN)</code> → stdin vira o pipe de entrada. <code>dup2(pipeOut[1], STDOUT)</code> → stdout vira o pipe de saída. Fecha os fds originais. Monta argv = [cgiPath, scriptFile, NULL]. Chama <code>execve()</code>. Se execve falhar: escreve "Status: 500\r\n\r\n" no stdout e <code>_exit(1)</code>.</p>
-      <p><strong>Processo pai:</strong> fecha as pontas usadas pelo filho. Seta os pipes como non-blocking. Retorna a struct <code>CgiProcess</code>.</p>
+      <p><strong>Antes do fork:</strong> cria apenas um pipe (<code>pipeOut[2]</code> — saída do CGI). Chama <code>buildEnvp()</code> para montar as variáveis de ambiente. Cria arquivo temporário <code>/tmp/webserv_cgi_PID_TIME_COUNTER</code> para guardar a saída do CGI (<code>proc.tmpFd</code>).</p>
+      <p><strong>Processo filho (pid==0):</strong> abre <code>reqBodyPath</code> (o arquivo tmp com o body da requisição) e faz <code>dup2(bodyFd, STDIN_FILENO)</code> — stdin vira o arquivo de body. <code>dup2(pipeOut[1], STDOUT_FILENO)</code> → stdout vira o pipe de saída. Fecha fds desnecessários. Monta argv = [cgiPath, scriptFile, NULL]. Chama <code>execve()</code>. Se execve falhar: escreve "Status: 500\r\n\r\n" no stdout e <code>_exit(1)</code>.</p>
+      <p><strong>Processo pai:</strong> fecha <code>pipeOut[1]</code> (ponta de escrita). Seta <code>pipeOut[0]</code> como non-blocking. Retorna a struct <code>CgiProcess{valid, pid, pipeOut[0], tmpFd, tmpPath}</code>. Não há pipe de entrada — sem handleCgiWrite.</p>
     </div>
     <div class="chain">
-      <span class="fn">pipe(pipeIn) pipe(pipeOut)</span><span class="arr">→</span>
+      <span class="fn">pipe(pipeOut)</span><span class="arr">→</span>
       <span class="fn">buildEnvp()</span><span class="arr">→</span>
-      <span class="fn">open(tmpPath)</span><span class="arr">→</span>
+      <span class="fn">open(cgiTmpPath)</span><span class="arr">→</span>
       <span class="fn yellow">fork()</span><span class="arr">→ filho →</span>
-      <span class="fn">dup2() execve()</span>
+      <span class="fn">dup2(bodyFile, STDIN) dup2(pipeOut[1], STDOUT) execve()</span>
     </div>
   </div>
 
@@ -585,13 +581,13 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
   <div class="flow">
     <div class="flow-head"><span class="flow-icon">💾</span><span class="flow-title">handleCgiRead() → arquivo temporário → finishCgi()</span><span class="flow-file">WebServ::handleCgiRead() + CgiHandler::finishCgi()</span></div>
     <div class="flow-body">
-      <p><code>handleCgiRead()</code>: lê do pipeOut em chunks de 64KB e escreve no tmpFd. Acumula o total em <code>cgiTotalOutput</code>. Quando o read retorna 0 ou negativo (CGI fechou o pipe) → fecha o pipe → chama <code>finishCgi(clientFd)</code>.</p>
-      <p><code>finishCgi()</code>: faz waitpid bloqueante do processo CGI e verifica pelo status de saída se ele terminou bem ou crashou (sinal recebido ou código de saída diferente de zero) — se crashou, responde 500 direto, descartando qualquer saída parcial que o script tenha produzido. Senão, chama <code>CgiHandler::finishCgi(tmpFd, tmpPath, totalOutput)</code> que: fecha e reabre o tmp para leitura, lê os primeiros 8KB para encontrar os headers CGI (<code>Status:</code> e <code>Content-Type:</code>), calcula o offset onde começa o body, retorna <code>CgiResult</code>.</p>
-      <p>O <code>WebServ::finishCgi()</code> usa o <code>CgiResult</code> para chamar <code>client->setFileResponse()</code> com o arquivo tmp — o corpo da resposta é o tmp a partir do offset do body. O tmp é deletado quando o Client é destruído (<code>deleteFileOnClose=true</code>).</p>
+      <p><code>handleCgiRead()</code>: lê do <code>cgiPipeOut</code> em chunks de 64KB e escreve no <code>cgiTmpFd</code>. Acumula o total em <code>cgiTotalOutput</code>. Quando o read retorna 0 ou negativo com errno != EAGAIN (CGI fechou o pipe) → remove pipe do cgiPipeToClient e pollfds → fecha pipe → chama <code>finishCgi(clientFd)</code>.</p>
+      <p><code>WebServ::finishCgi()</code>: faz <code>waitpid</code> bloqueante do processo CGI. Verifica se crashou: <code>WIFSIGNALED(status) || (WIFEXITED &amp;&amp; WEXITSTATUS != 0)</code> — se crashou, responde 500. Senão, chama <code>CgiHandler::finishCgi(cgiTmpFd, cgiTmpPath, cgiTotalOutput)</code> que: fecha e reabre o tmp para leitura, lê os primeiros 8KB para encontrar os headers CGI (<code>Status:</code> e <code>Content-Type:</code>), calcula offset do body, retorna <code>CgiResult</code>.</p>
+      <p>Com o <code>CgiResult</code>: monta o header HTTP e chama <code>client->setFileResponse(header, tmpPath, bodySize, offset, deleteOnClose=true)</code>. O tmp é deletado quando o Client é destruído.</p>
     </div>
   </div>
 
-  <div class="why">A saída do CGI vai para um arquivo temporário (não para memória) para suportar respostas grandes sem estourar RAM. O arquivo é servido em chunks de 64KB pelo mesmo mecanismo de fileResponse que serve arquivos estáticos — reuso de código.</why>
+  <div class="why">Tanto o body da requisição quanto a saída do CGI vão para arquivos temporários em <code>/tmp</code> — nunca para memória. Isso suporta uploads e respostas grandes sem estourar RAM. O mesmo mecanismo de <code>fileResponse</code> serve arquivos estáticos, saídas de CGI e qualquer arquivo grande — reuso total de código.</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════ -->
@@ -629,14 +625,19 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
   <table class="states">
     <thead><tr><th>Atributo</th><th>Quem seta</th><th>O que significa</th></tr></thead>
     <tbody>
-      <tr><td>requestBuffer</td><td>appendRequest()</td><td>Acumula dados crus da rede</td></tr>
-      <tr><td>requestComplete</td><td>isRequestComplete()</td><td>Requisição inteira chegou</td></tr>
-      <tr><td>responseBuffer</td><td>setResponse() / setFileResponse()</td><td>Header e body em memória</td></tr>
+      <tr><td>requestBuffer</td><td>appendRequest()</td><td>Acumula os headers da requisição (body vai para arquivo)</td></tr>
+      <tr><td>reqTmpFd / reqTmpPath</td><td>isRequestComplete()</td><td>Arquivo temporário onde o body da requisição é escrito</td></tr>
+      <tr><td>reqBodyWritten</td><td>appendRequest()</td><td>Total de bytes do body escritos no arquivo tmp</td></tr>
+      <tr><td>headersParsed</td><td>isRequestComplete()</td><td>Headers foram completamente recebidos e parseados</td></tr>
+      <tr><td>requestComplete</td><td>isRequestComplete()</td><td>Requisição inteira chegou (headers + body)</td></tr>
+      <tr><td>responseBuffer</td><td>setResponse() / setFileResponse()</td><td>Header HTTP em memória (e body se não file-based)</td></tr>
       <tr><td>responseSendOffset</td><td>advanceResponseOffset()</td><td>Quantos bytes já foram enviados</td></tr>
       <tr><td>fileBasedResponse</td><td>setFileResponse()</td><td>Corpo está em arquivo, não em memória</td></tr>
-      <tr><td>responseFileFd</td><td>setFileResponse()</td><td>fd aberto do arquivo a servir</td></tr>
+      <tr><td>responseFileFd</td><td>setFileResponse()</td><td>fd aberto do arquivo a servir (estático ou CGI tmp)</td></tr>
       <tr><td>cgiRunning</td><td>handleClientRead()</td><td>Tem um processo CGI ativo para este cliente</td></tr>
-      <tr><td>cgiPid/pipeIn/pipeOut/tmpFd</td><td>handleClientRead()</td><td>Estado completo do CGI deste cliente</td></tr>
+      <tr><td>cgiPid / cgiPipeOut / cgiTmpFd</td><td>handleClientRead()</td><td>Estado completo do CGI (sem pipeIn — body via arquivo)</td></tr>
+      <tr><td>cgiTmpPath / cgiTotalOutput</td><td>handleClientRead() / handleCgiRead()</td><td>Caminho e tamanho do arquivo temporário de saída do CGI</td></tr>
+      <tr><td>cgiStartTime</td><td>handleClientRead()</td><td>Timestamp de início do CGI (timeout em 30s)</td></tr>
       <tr><td>sending100Continue</td><td>handleClientRead()</td><td>Está enviando o 100-Continue agora</td></tr>
     </tbody>
   </table>
@@ -644,16 +645,16 @@ hr.section-div{border:none;border-top:1px solid var(--border);margin:2rem 0}
   <div class="flow">
     <div class="flow-head"><span class="flow-icon">🧹</span><span class="flow-title">removeClient() — limpeza total</span><span class="flow-file">WebServ::removeClient()</span></div>
     <div class="flow-body">
-      <p>Se o cliente tinha CGI ativo: remove pipeIn e pipeOut do <code>cgiPipeToClient</code> e do pollfds. Manda SIGKILL no processo CGI e faz waitpid para não deixar zumbi.</p>
-      <p>Chama <code>delete client</code> — o destrutor do Client fecha responseFileFd, deleta o arquivo tmp do CGI se existir, fecha pipes pendentes.</p>
-      <p>Remove de <code>clients</code>, chama <code>removePollFd(clientFd)</code>, fecha o fd do socket.</p>
+      <p>Se o cliente tinha CGI ativo (<code>cgiPipeOut >= 0</code>): remove do <code>cgiPipeToClient</code> e chama <code>removePollFd(cgiPipeOut)</code>. Se <code>cgiPid > 0</code>: manda SIGKILL e waitpid para não deixar zumbi.</p>
+      <p>Chama <code>delete client</code> — o destrutor do Client: fecha <code>responseFileFd</code>, deleta arquivo da resposta se <code>deleteFileOnClose</code>, fecha <code>cgiPipeOut</code> e <code>cgiTmpFd</code>, deleta <code>cgiTmpPath</code> se existir, fecha <code>reqTmpFd</code> e deleta <code>reqTmpPath</code>.</p>
+      <p>Remove de <code>clients</code>, chama <code>removePollFd(clientFd)</code> (marca fd = -1 no vetor), fecha o fd do socket.</p>
     </div>
     <div class="chain">
       <span class="fn red">removeClient()</span><span class="arr">→</span>
-      <span class="fn">remove pipes do cgiPipeToClient</span><span class="arr">→</span>
+      <span class="fn">remove cgiPipeOut do cgiPipeToClient</span><span class="arr">→</span>
       <span class="fn yellow">kill() + waitpid()</span><span class="arr">→</span>
-      <span class="fn orange">delete Client</span><span class="arr">→</span>
-      <span class="fn">removePollFd() + close(fd)</span>
+      <span class="fn orange">delete Client (fecha tudo)</span><span class="arr">→</span>
+      <span class="fn">removePollFd(fd=-1) + close(fd)</span>
     </div>
   </div>
 </div>

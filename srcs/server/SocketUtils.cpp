@@ -43,3 +43,10 @@ void SocketUtils::setNonBlocking(int fd) {
 	if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
 		throw std::runtime_error("Failed to set non-blocking flag");
 }
+
+time_t SocketUtils::getCurrentTime() {
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	return tv.tv_sec;
+}

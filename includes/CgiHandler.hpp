@@ -1,6 +1,7 @@
 #ifndef CGIHANDLER_HPP
 # define CGIHANDLER_HPP
 
+# include "SocketUtils.hpp"
 # include "HttpRequest.hpp"
 # include <string>
 # include <vector>
@@ -19,7 +20,6 @@ struct CgiResult {
 
 struct CgiProcess {
 	pid_t pid;
-	int pipeIn;
 	int pipeOut;
 	int tmpFd;
 	char tmpPath[64];
@@ -32,10 +32,10 @@ public:
 	~CgiHandler();
 
 	static CgiProcess startCgi(const std::string &cgiPath, const std::string &scriptFile,
-		const HttpRequest &req);
+		const HttpRequest &req, const std::string &reqBodyPath, size_t bodySize);
 	static CgiResult finishCgi(int tmpFd, const char *tmpPath, size_t totalOutput);
 	static void buildEnvp(const HttpRequest &req, const std::string &scriptFile,
-		std::vector<char *> &envp);
+		std::vector<char *> &envp, size_t bodySize);
 	static void freeEnvp(std::vector<char *> &envp);
 
 private:

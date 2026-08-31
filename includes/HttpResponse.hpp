@@ -1,6 +1,7 @@
 #ifndef HTTPRESPONSE_HPP
 # define HTTPRESPONSE_HPP
 
+# include "SocketUtils.hpp"
 # include "HttpRequest.hpp"
 # include "Config.hpp"
 # include <string>
@@ -12,7 +13,7 @@ public:
 	HttpResponse();
 	~HttpResponse();
 
-	std::string generateResponse(const HttpRequest &req, const ServerConfig &serverConfig, std::map<std::string, std::map<std::string, std::string> > &sessions);
+	std::string generateResponse(const HttpRequest &req, const ServerConfig &serverConfig, std::map<std::string, std::map<std::string, std::string> > &sessions, const std::string &reqBodyPath = "", size_t bodySize = 0);
 	std::string buildResponseString() const;
 	std::string buildResponseHeader() const;
 	std::string getErrorResponse(int code, const ServerConfig *srv = NULL);
@@ -46,7 +47,7 @@ private:
 	std::string cgiExecPath;
 
 	void handleGet(const HttpRequest &req, const ServerConfig &serverConfig, const std::string &targetFile, const LocationConfig *matchedLoc);
-	void handlePost(const HttpRequest &req, const ServerConfig &serverConfig, const std::string &targetFile, const LocationConfig *matchedLoc);
+	void handlePost(const HttpRequest &req, const ServerConfig &serverConfig, const std::string &targetFile, const LocationConfig *matchedLoc, const std::string &reqBodyPath = "", size_t bodySize = 0);
 	void handleDelete(const HttpRequest &req, const ServerConfig &serverConfig, const std::string &targetFile);
 	void setErrorResponse(int code, const ServerConfig *srv = NULL);
 

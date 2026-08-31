@@ -13,7 +13,6 @@ public:
 	const std::string &getUri() const;
 	const std::string &getVersion() const;
 	const std::map<std::string, std::string> &getHeaders() const;
-	const std::string &getBody() const;
 	bool isValid() const;
 	std::string getCookie(const std::string &name) const;
 
@@ -22,7 +21,6 @@ private:
 	std::string uri;
 	std::string version;
 	std::map<std::string, std::string> headers;
-	std::string body;
 	bool valid;
 
 	void parseRequestLine(const std::string &line);

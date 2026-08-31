@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "Client.hpp"
 #include <sstream>
 #include <unistd.h>
@@ -9,12 +10,9 @@ Client::Client(int f, int s) :
 	sending100Continue(false),
 	cgiRunning(false),
 	cgiPid(-1),
-	cgiPipeIn(-1),
 	cgiPipeOut(-1),
 	cgiTmpFd(-1),
-	cgiBodyWritten(0),
 	cgiTotalOutput(0),
-	cgiBodyDone(false),
 	cgiStartTime(0),
 	fd(f),
 	serverFd(s),
@@ -33,29 +31,96 @@ Client::Client(int f, int s) :
 	contentLength(0),
 	isChunked(false),
 	needs100Continue(false),
-	hasSent100Continue(false)
+	hasSent100Continue(false),
+	reqTmpFd(-1),
+	reqBodyWritten(0),
+	chunkRemaining(0),
+	chunkReadingSize(true)
 {
 	std::memset(cgiTmpPath, 0, sizeof(cgiTmpPath));
+	std::memset(reqTmpPath, 0, sizeof(reqTmpPath));
 }
 
 Client::~Client() {
 	if (responseFileFd >= 0)
 		close(responseFileFd);
 	if (!responseFilePath.empty() && deleteFileOnClose)
-		unlink(responseFilePath.c_str());
-	if (cgiPipeIn >= 0)
-		close(cgiPipeIn);
+		std::remove(responseFilePath.c_str());
 	if (cgiPipeOut >= 0)
 		close(cgiPipeOut);
 	if (cgiTmpFd >= 0)
 		close(cgiTmpFd);
 	if (cgiTmpPath[0])
-		unlink(cgiTmpPath);
+		std::remove(cgiTmpPath);
+	if (reqTmpFd >= 0)
+		close(reqTmpFd);
+	if (reqTmpPath[0])
+		std::remove(reqTmpPath);
+}
+
+void Client::processChunkedBody(const char *data, size_t len) {
+	size_t pos = 0;
+	while (pos < len) {
+		if (chunkReadingSize) {
+			chunkBuf += data[pos++];
+			if (chunkBuf.length() >= 2 && chunkBuf.substr(chunkBuf.length() - 2) == "\r\n") {
+				std::string hexSize = chunkBuf.substr(0, chunkBuf.length() - 2);
+				size_t semiPos = hexSize.find(';');
+				if (semiPos != std::string::npos)
+					hexSize = hexSize.substr(0, semiPos);
+				std::istringstream hexStream(hexSize);
+				if (hexStream >> std::hex >> chunkRemaining) {
+					chunkReadingSize = false;
+					if (chunkRemaining == 0)
+						requestComplete = true;
+				}
+				chunkBuf.clear();
+			}
+		}
+		else {
+			size_t toWrite = len - pos;
+			if (toWrite > chunkRemaining)
+				toWrite = chunkRemaining;
+			if (toWrite > 0 && reqTmpFd >= 0) {
+				write(reqTmpFd, data + pos, toWrite);
+				reqBodyWritten += toWrite;
+			}
+			chunkRemaining -= toWrite;
+			pos += toWrite;
+			if (chunkRemaining == 0) {
+				chunkReadingSize = true;
+				// Need to skip \r\n after chunk data
+				if (pos < len && data[pos] == '\r') { pos++; }
+				if (pos < len && data[pos] == '\n') { pos++; }
+			}
+		}
+	}
 }
 
 void Client::appendRequest(const char *buffer, ssize_t bytes) {
-	requestBuffer.append(buffer, bytes);
+	if (!headersParsed) {
+		requestBuffer.append(buffer, bytes);
+		if (requestBuffer.find("\r\n\r\n") != std::string::npos) {
+			isRequestComplete(); // Trigger parsing
+		}
+	} else {
+		if (isChunked)
+			processChunkedBody(buffer, bytes);
+		else if (contentLength > 0) {
+			size_t toWrite = bytes;
+			if (reqBodyWritten + bytes > contentLength)
+				toWrite = contentLength - reqBodyWritten;
+			if (toWrite > 0 && reqTmpFd >= 0) {
+				write(reqTmpFd, buffer, toWrite);
+				reqBodyWritten += toWrite;
+			}
+		}
+	}
 }
+
+int Client::getReqTmpFd() const { return (reqTmpFd); }
+const char *Client::getReqTmpPath() const { return (reqTmpPath); }
+size_t Client::getReqBodyWritten() const { return (reqBodyWritten); }
 
 const std::string &Client::getRequestBuffer() const {
 	return (requestBuffer);
@@ -170,22 +235,18 @@ bool Client::isRequestComplete() {
 		}
 		headersParsed = true;
 		size_t clPos = findHeaderValue(requestBuffer, headerEnd, "Content-Length: ");
-		if (clPos == std::string::npos)
-			clPos = findHeaderValue(requestBuffer, headerEnd, "Content-length: ");
-		if (clPos == std::string::npos)
-			clPos = findHeaderValue(requestBuffer, headerEnd, "content-length: ");
+		if (clPos == std::string::npos) clPos = findHeaderValue(requestBuffer, headerEnd, "Content-length: ");
+		if (clPos == std::string::npos) clPos = findHeaderValue(requestBuffer, headerEnd, "content-length: ");
 		if (clPos != std::string::npos) {
 			size_t valueStart = clPos + 16;
 			size_t valueEnd = requestBuffer.find("\r\n", valueStart);
-			if (valueEnd != std::string::npos && valueEnd < headerEnd) {
+			if (valueEnd != std::string::npos && valueEnd <= headerEnd) {
 				std::string clStr = requestBuffer.substr(valueStart, valueEnd - valueStart);
 				size_t trimStart = clStr.find_first_not_of(" \t");
 				size_t trimEnd = clStr.find_last_not_of(" \t");
-				if (trimStart != std::string::npos)
-					clStr = clStr.substr(trimStart, trimEnd - trimStart + 1);
+				if (trimStart != std::string::npos) clStr = clStr.substr(trimStart, trimEnd - trimStart + 1);
 				std::istringstream clStream(clStr);
-				if (!(clStream >> contentLength))
-					contentLength = 0;
+				if (!(clStream >> contentLength)) contentLength = 0;
 			}
 		}
 		if (requestBuffer.find("Transfer-Encoding: chunked") != std::string::npos ||
@@ -193,29 +254,43 @@ bool Client::isRequestComplete() {
 			isChunked = true;
 		}
 		size_t expectPos = requestBuffer.find("Expect: 100-continue");
-		if (expectPos == std::string::npos)
-			expectPos = requestBuffer.find("Expect: 100-Continue");
-		if (expectPos != std::string::npos && expectPos < headerEnd)
-			needs100Continue = true;
+		if (expectPos == std::string::npos) expectPos = requestBuffer.find("Expect: 100-Continue");
+		if (expectPos != std::string::npos && expectPos < headerEnd) needs100Continue = true;
+
+		if (contentLength > 0 || isChunked) {
+			static unsigned int tmpCounter = 0;
+			++tmpCounter;
+			std::ostringstream tmpName;
+			tmpName << "/tmp/webserv_req_" << static_cast<const void*>(this) << "_" << static_cast<long>(SocketUtils::getCurrentTime()) << "_" << tmpCounter;
+			std::strncpy(reqTmpPath, tmpName.str().c_str(), sizeof(reqTmpPath) - 1);
+			reqTmpFd = open(reqTmpPath, O_RDWR | O_CREAT | O_EXCL, 0600);
+
+			std::string initialBody = requestBuffer.substr(headerEnd + 4);
+			requestBuffer.erase(headerEnd + 4); // Keep only headers in memory
+
+			if (!initialBody.empty()) {
+				if (isChunked)
+					processChunkedBody(initialBody.c_str(), initialBody.length());
+				else {
+					write(reqTmpFd, initialBody.c_str(), initialBody.length());
+					reqBodyWritten += initialBody.length();
+				}
+			}
+		} else {
+			requestBuffer.erase(headerEnd + 4);
+		}
 	}
+
 	if (headersParsed) {
 		if (contentLength > 0) {
-			if (requestBuffer.length() >= headerEnd + 4 + contentLength) {
+			if (reqBodyWritten >= contentLength) {
 				requestComplete = true;
 				return (true);
 			}
 			return (false);
 		}
 		if (isChunked) {
-			if (requestBuffer.length() >= 5) {
-				const char* buf = requestBuffer.c_str();
-				size_t len = requestBuffer.length();
-				if (buf[len-5] == '0' && buf[len-4] == '\r' && buf[len-3] == '\n' && buf[len-2] == '\r' && buf[len-1] == '\n') {
-					requestComplete = true;
-					return (true);
-				}
-			}
-			return (false);
+			return (requestComplete);
 		}
 		requestComplete = true;
 		return (true);
@@ -246,7 +321,7 @@ bool Client::isResponseComplete() const {
 bool Client::isCgiTimedOut() const {
 	if (!cgiRunning || cgiStartTime == 0)
 		return (false);
-	time_t now = time(NULL);
+	time_t now = SocketUtils::getCurrentTime();
 	return ((now - cgiStartTime) > CGI_TIMEOUT);
 }
 
@@ -256,6 +331,9 @@ int Client::getServerFd() const {
 
 bool Client::isRequestTooLarge(size_t maxBodySize) const {
 	if (headersParsed && contentLength > maxBodySize) {
+		return (true);
+	}
+	if (isChunked && reqBodyWritten > maxBodySize) {
 		return (true);
 	}
 	return (requestBuffer.length() > maxBodySize + 16384);

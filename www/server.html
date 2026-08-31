@@ -137,7 +137,7 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
     <h2>// O que este módulo faz e quem são suas 3 classes</h2>
     <p><strong style="color:#90e0a8">SocketUtils</strong> — helper estático puro. Duas funções: cria um socket TCP de escuta (<code>createListeningSocket</code>) e seta um fd como não-bloqueante (<code>setNonBlocking</code>). Não guarda estado, não pode ser instanciada — todos os construtores são privados.</p>
     <p><strong style="color:#90e0a8">Client</strong> — representa uma conexão TCP aberta com um cliente. Acumula o texto cru da requisição num buffer, gerencia os dois modos de resposta (buffer em memória ou arquivo em disco), e carrega todo o estado do CGI associado a essa conexão.</p>
-    <p><strong style="color:#90e0a8">WebServ</strong> — o motor do servidor. Dono único do array <code>pollfds</code> e do loop <code>poll()</code>. Aceita conexões, despacha leitura e escrita de clientes, orquestra o CGI assíncrono (fork → write stdin → read stdout → finishCgi) e limpa recursos via <code>removeClient()</code>.</p>
+    <p><strong style="color:#90e0a8">WebServ</strong> — o motor do servidor. Dono único do array <code>pollfds</code> e do loop <code>poll()</code>. Aceita conexões, despacha leitura e escrita de clientes, orquestra o CGI assíncrono (fork → body em arquivo → read stdout → finishCgi) e limpa recursos via <code>removeClient()</code>.</p>
     <p>Hierarquia de dependência: <strong>SocketUtils</strong> não depende de ninguém. <strong>Client</strong> não depende de ninguém. <strong>WebServ</strong> depende de todos — Config, Client, SocketUtils, HttpRequest, HttpResponse, CgiHandler.</p>
   </div>
 </div>
@@ -250,12 +250,9 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
     <span class="var">sending100Continue</span>(<span class="kw">false</span>),
     <span class="var">cgiRunning</span>(<span class="kw">false</span>),
     <span class="var">cgiPid</span>(-<span class="num">1</span>),        <span class="cmt">// -1 = sem processo CGI ativo</span>
-    <span class="var">cgiPipeIn</span>(-<span class="num">1</span>),    <span class="cmt">// -1 = pipe não aberto</span>
-    <span class="var">cgiPipeOut</span>(-<span class="num">1</span>),
+    <span class="var">cgiPipeOut</span>(-<span class="num">1</span>),   <span class="cmt">// -1 = pipe não aberto</span>
     <span class="var">cgiTmpFd</span>(-<span class="num">1</span>),
-    <span class="var">cgiBodyWritten</span>(<span class="num">0</span>),
     <span class="var">cgiTotalOutput</span>(<span class="num">0</span>),
-    <span class="var">cgiBodyDone</span>(<span class="kw">false</span>),
     <span class="var">cgiStartTime</span>(<span class="num">0</span>),
     <span class="var">fd</span>(<span class="var">f</span>),             <span class="cmt">// fd do socket do cliente</span>
     <span class="var">serverFd</span>(<span class="var">s</span>),       <span class="cmt">// fd do socket de listen que aceitou essa conexão</span>
@@ -292,22 +289,21 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
     <div class="func-body">
       <div class="func-section">
         <div class="func-label">Responsabilidades do destrutor — RAII</div>
-        <div class="func-text">O destrutor do Client é o ponto central de liberação de recursos. Implementa o princípio RAII (Resource Acquisition Is Initialization): o recurso é liberado quando o objeto sai de escopo ou é deletado.</div>
+        <div class="func-text">O destrutor do Client é o ponto central de liberação de recursos. Implementa o princípio RAII.</div>
       </div>
       <div class="code-block">
         <div class="code-file">Client.cpp — ~Client()</div>
         <pre><span class="kw">if</span> (<span class="var">responseFileFd</span> >= <span class="num">0</span>)
     <span class="fn">close</span>(<span class="var">responseFileFd</span>);                  <span class="cmt">// fecha arquivo estático ou tmp do CGI</span>
 <span class="kw">if</span> (!<span class="var">responseFilePath</span>.<span class="fn">empty</span>() && <span class="var">deleteFileOnClose</span>)
-    <span class="fn">unlink</span>(<span class="var">responseFilePath</span>.<span class="fn">c_str</span>());       <span class="cmt">// deleta arquivo tmp do CGI</span>
-<span class="kw">if</span> (<span class="var">cgiPipeIn</span> >= <span class="num">0</span>)  <span class="fn">close</span>(<span class="var">cgiPipeIn</span>);    <span class="cmt">// fecha pipe stdin do CGI se ainda aberto</span>
+    <span class="fn">std::remove</span>(<span class="var">responseFilePath</span>.<span class="fn">c_str</span>());   <span class="cmt">// deleta arquivo tmp do CGI (std::remove)</span>
 <span class="kw">if</span> (<span class="var">cgiPipeOut</span> >= <span class="num">0</span>) <span class="fn">close</span>(<span class="var">cgiPipeOut</span>);
-<span class="kw">if</span> (<span class="var">cgiTmpFd</span> >= <span class="num">0</span>)   <span class="fn">close</span>(<span class="var">cgiTmpFd</span>);     <span class="cmt">// fecha fd do arquivo tmp (antes de unlink)</span>
+<span class="kw">if</span> (<span class="var">cgiTmpFd</span> >= <span class="num">0</span>)   <span class="fn">close</span>(<span class="var">cgiTmpFd</span>);     <span class="cmt">// fecha fd do arquivo tmp</span>
 <span class="kw">if</span> (<span class="var">cgiTmpPath</span>[<span class="num">0</span>])                           <span class="cmt">// [0] != '\0' → path foi preenchido</span>
-    <span class="fn">unlink</span>(<span class="var">cgiTmpPath</span>);                       <span class="cmt">// deleta arquivo tmp se ainda existir</span></pre>
+    <span class="fn">std::remove</span>(<span class="var">cgiTmpPath</span>);               <span class="cmt">// deleta arquivo tmp se ainda existir</span></pre>
       </div>
       <div class="box box-warn">
-        O destrutor tem <strong>dois</strong> caminhos para deletar o arquivo temporário do CGI: <code>responseFilePath</code> + <code>deleteFileOnClose</code> (para o caso em que <code>setFileResponse()</code> foi chamado com o tmp) e <code>cgiTmpPath</code> (para o caso em que o CGI estava rodando mas nunca chegou ao <code>finishCgi()</code> — ex: timeout ou removeClient antes do CGI terminar). Isso garante que nenhum arquivo temporário fica para trás.
+        O destrutor tem <strong>dois</strong> caminhos para deletar o arquivo temporário do CGI: <code>responseFilePath</code> + <code>deleteFileOnClose</code> (para o caso em que <code>setFileResponse()</code> foi chamado com o tmp) e <code>cgiTmpPath</code> (para o caso em que o CGI estava rodando mas nunca chegou ao <code>finishCgi()</code>). Em ambos os casos usa <code>std::remove()</code> — equivalente ao <code>unlink()</code> POSIX. Isso garante que nenhum arquivo temporário fica para trás.
       </div>
     </div>
   </div>
@@ -331,23 +327,7 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
         <div class="func-text">Chama <code>requestBuffer.append(buffer, bytes)</code>. Esse método de <code>std::string</code> adiciona exatamente <code>bytes</code> caracteres do <code>buffer</code> ao final da string — correto para dados binários que podem conter <code>\0</code>. O <code>requestBuffer</code> acumula todos os dados de uma requisição que pode chegar fragmentada em múltiplos <code>recv()</code>.</div>
       </div>
       <div class="box box-why">
-        TCP é um protocolo de stream — não preserva fronteiras de mensagem. Uma requisição HTTP de 5KB pode chegar em 3 recv(): 2KB, 2KB, 1KB. Por isso acumulamos em buffer e só processamos quando <code>isRequestComplete()</code> confirma que temos tudo. <code>append(ptr, n)</code> é preferível a <code>+= string(ptr, n)</code> — não cria string intermediária.
-      </div>
-    </div>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
-      <span class="kw">bool</span> Client::<span class="name">isRequestTooLarge</span>(<span class="type">size_t</span> <span class="param">maxBodySize</span>) <span class="kw">const</span>
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Dois critérios de rejeição</div>
-        <div class="func-text"><strong>Critério 1:</strong> headers já foram parseados E <code>Content-Length</code> declarado excede o limite. Rejeita antes de receber o body completo — economiza banda.<br><br>
-        <strong>Critério 2:</strong> <code>requestBuffer.length() > maxBodySize + 16384</code>. O <code>+16384</code> (16KB) é uma margem para o tamanho dos headers — que não contam no limite do body. Captura clientes que enviam body grande sem declarar Content-Length.</div>
-      </div>
-      <div class="box box-syntax">
-        A função é <code>const</code> — não modifica nenhum atributo do Client. Funções const podem ser chamadas em referências const (<code>const Client &amp;c</code>). O compilador garante que nenhuma chamada dentro de uma função const modifica o objeto — proteção em tempo de compilação.
+        TCP é um protocolo de stream — não preserva fronteiras de mensagem. Uma requisição HTTP de 5KB pode chegar em 3 recv(): 2KB, 2KB, 1KB. Por isso acumulamos em buffer e só processamos quando <code>isRequestComplete()</code> confirma que temos tudo.
       </div>
     </div>
   </div>
@@ -372,89 +352,6 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
       </div>
     </div>
   </div>
-
-  <div class="func">
-    <div class="func-sig">
-      <span class="kw">void</span> Client::<span class="name">setFileResponse</span>(<span class="param">header</span>, <span class="param">filePath</span>, <span class="param">fileSize</span>, <span class="param">fileStartOffset</span>, <span class="param">deleteFile</span>)
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Modo arquivo — header em memória, body em disco</div>
-        <div class="func-text">Copia apenas o header para <code>responseHeader</code> e também para <code>responseBuffer</code> (que é usado como cache). Abre o arquivo com <code>open(filePath, O_RDONLY)</code>. Se <code>fileStartOffset > 0</code> — usado para o arquivo tmp do CGI cujo body não começa no byte 0 — lê e descarta os bytes iniciais com <code>read()</code> em loop até avançar o cursor para a posição correta.</div>
-      </div>
-      <div class="code-block">
-        <div class="code-file">Client.cpp — setFileResponse() — avanço do offset</div>
-        <pre><span class="var">responseFileFd</span> = <span class="fn">open</span>(<span class="var">filePath</span>.<span class="fn">c_str</span>(), O_RDONLY);
-<span class="kw">if</span> (<span class="var">responseFileFd</span> >= <span class="num">0</span> && <span class="var">responseFileStartOffset</span> > <span class="num">0</span>) {
-    <span class="type">char</span> <span class="var">skipBuf</span>[<span class="num">8192</span>];
-    <span class="type">size_t</span> <span class="var">toSkip</span> = <span class="var">responseFileStartOffset</span>;
-    <span class="kw">while</span> (<span class="var">toSkip</span> > <span class="num">0</span>) {
-        <span class="type">size_t</span> <span class="var">readSize</span> = <span class="var">toSkip</span> > <span class="kw">sizeof</span>(<span class="var">skipBuf</span>) ? <span class="kw">sizeof</span>(<span class="var">skipBuf</span>) : <span class="var">toSkip</span>;
-        <span class="type">ssize_t</span> <span class="var">ret</span> = <span class="fn">read</span>(<span class="var">responseFileFd</span>, <span class="var">skipBuf</span>, <span class="var">readSize</span>);
-        <span class="kw">if</span> (<span class="var">ret</span> <= <span class="num">0</span>) <span class="kw">break</span>;
-        <span class="var">toSkip</span> -= <span class="var">ret</span>;
-    }
-}</pre>
-      </div>
-      <div class="box box-why">
-        Por que não usar <code>lseek()</code> para avançar o offset? Teria sido mais simples: <code>lseek(responseFileFd, fileStartOffset, SEEK_SET)</code>. Ler e descartar é equivalente mas funciona mesmo em fds que não suportam seek (pipes). Para arquivos normais e tmpfs ambos funcionam. A implementação por leitura é mais defensiva.
-      </div>
-    </div>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
-      <span class="type">ssize_t</span> Client::<span class="name">getResponseData</span>(<span class="type">char</span> *<span class="param">buf</span>, <span class="type">size_t</span> <span class="param">maxLen</span>)
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Como funciona em modo buffer</div>
-        <div class="func-text">Calcula o restante: <code>responseBuffer.length() - responseSendOffset</code>. Copia até <code>maxLen</code> bytes para <code>buf</code> usando <code>memcpy</code> a partir de <code>responseBuffer.c_str() + responseSendOffset</code>. Simples ponteiro aritmético.</div>
-      </div>
-      <div class="func-section">
-        <div class="func-label">Como funciona em modo arquivo — o cache de 64KB</div>
-        <div class="func-text">O <code>responseBuffer</code> é reutilizado como cache de leitura do arquivo. <code>cacheOffset</code> rastreia quantos bytes do cache já foram consumidos pelo <code>send()</code>.<br><br>
-        Se o cache ainda tem dados (<code>responseBuffer.length() - cacheOffset > 0</code>): copia dali para buf.<br><br>
-        Se o cache está vazio: limpa o buffer, zera cacheOffset, lê 64KB do arquivo com <code>read(responseFileFd, readBuf, 65536)</code> e preenche o cache novamente.<br><br>
-        Isso garante que o arquivo nunca fica todo em memória — apenas 64KB por vez.</div>
-      </div>
-      <div class="code-block">
-        <div class="code-file">Client.cpp — getResponseData() — modo arquivo</div>
-        <pre><span class="type">size_t</span> <span class="var">cachedRemaining</span> = <span class="var">responseBuffer</span>.<span class="fn">length</span>() - <span class="var">cacheOffset</span>;
-<span class="kw">if</span> (<span class="var">cachedRemaining</span> == <span class="num">0</span>) {             <span class="cmt">// cache vazio → recarrega do arquivo</span>
-    <span class="var">responseBuffer</span>.<span class="fn">clear</span>();
-    <span class="var">cacheOffset</span> = <span class="num">0</span>;
-    <span class="kw">if</span> (<span class="var">responseFileFd</span> >= <span class="num">0</span>) {
-        <span class="type">char</span> <span class="var">readBuf</span>[<span class="num">65536</span>];
-        <span class="type">ssize_t</span> <span class="var">bytesRead</span> = <span class="fn">read</span>(<span class="var">responseFileFd</span>, <span class="var">readBuf</span>, <span class="kw">sizeof</span>(<span class="var">readBuf</span>));
-        <span class="kw">if</span> (<span class="var">bytesRead</span> > <span class="num">0</span>) {
-            <span class="var">responseBuffer</span>.<span class="fn">assign</span>(<span class="var">readBuf</span>, <span class="var">bytesRead</span>); <span class="cmt">// atribui exatamente bytesRead bytes</span>
-            <span class="var">cachedRemaining</span> = <span class="var">bytesRead</span>;
-        }
-    }
-}
-<span class="kw">if</span> (<span class="var">cachedRemaining</span> == <span class="num">0</span>) <span class="kw">return</span> (<span class="num">0</span>);  <span class="cmt">// arquivo esgotado</span>
-<span class="type">size_t</span> <span class="var">toSend</span> = <span class="var">cachedRemaining</span> < <span class="var">maxLen</span> ? <span class="var">cachedRemaining</span> : <span class="var">maxLen</span>;
-<span class="type">std::memcpy</span>(<span class="var">buf</span>, <span class="var">responseBuffer</span>.<span class="fn">c_str</span>() + <span class="var">cacheOffset</span>, <span class="var">toSend</span>);
-<span class="kw">return</span> (<span class="var">toSend</span>);</pre>
-      </div>
-      <div class="box box-note">
-        <strong>Por que dois offsets:</strong> <code>responseSendOffset</code> rastreia o total enviado ao cliente (usado em <code>getResponseRemaining()</code> e <code>advanceResponseOffset()</code>). <code>cacheOffset</code> rastreia a posição dentro do cache de 64KB atual. Quando o cache é substituído por uma nova leitura, <code>cacheOffset</code> é zerado mas <code>responseSendOffset</code> continua crescendo até o total do arquivo.
-      </div>
-    </div>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
-      <span class="kw">void</span> Client::<span class="name">advanceResponseOffset</span>(<span class="type">ssize_t</span> <span class="param">bytes</span>)
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Atualiza offsets e verifica conclusão</div>
-        <div class="func-text">Incrementa <code>responseSendOffset</code>. Em modo arquivo, também incrementa <code>cacheOffset</code>. Calcula o total da resposta e seta <code>responseComplete = true</code> se <code>responseSendOffset >= total</code>. Chamada por <code>WebServ::handleClientWrite()</code> com o valor retornado pelo <code>send()</code>.</div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- ══════════════════════════════ -->
@@ -471,57 +368,16 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
     </div>
     <div class="func-body">
       <div class="func-section">
-        <div class="func-label">Fase 1 — parse de headers (executado uma única vez)</div>
-        <div class="func-text">A flag <code>headersParsed</code> garante que a fase de parse de headers roda apenas na primeira chamada em que os headers chegaram completos. Isso é importante porque <code>isRequestComplete()</code> é chamada a cada <code>recv()</code> — não queremos reparsear os headers a cada fragmento de dados.</div>
+        <div class="func-label">Fase 1 — parse de headers</div>
+        <div class="func-text">A flag <code>headersParsed</code> garante que a fase de parse de headers roda apenas na primeira chamada em que os headers chegaram completos.</div>
       </div>
       <div class="func-section">
         <div class="func-label">Fase 2 — verificação de completude do body</div>
         <div class="func-text">Três casos após os headers estarem parsados:<br>
         <strong>a) Content-Length declarado:</strong> espera <code>requestBuffer.length() >= headerEnd + 4 + contentLength</code>. O <code>+4</code> é para os 4 bytes do <code>\r\n\r\n</code>.<br>
-        <strong>b) Transfer-Encoding: chunked:</strong> espera que o buffer termine com <code>"0\r\n\r\n"</code> — o chunk terminal do chunked encoding.<br>
+        <strong>b) Transfer-Encoding: chunked:</strong> espera que o buffer termine com <code>"0\r\n\r\n"</code>.<br>
         <strong>c) Nenhum dos dois:</strong> requisição sem body — completa assim que os headers chegaram.
         </div>
-      </div>
-      <div class="code-block">
-        <div class="code-file">Client.cpp — isRequestComplete() — lógica principal</div>
-        <pre><span class="kw">if</span> (!<span class="var">headersParsed</span>) {
-    <span class="var">headerEnd</span> = requestBuffer.<span class="fn">find</span>(<span class="str">"\r\n\r\n"</span>);
-    <span class="kw">if</span> (<span class="var">headerEnd</span> == <span class="type">std::string</span>::npos) <span class="kw">return</span> (<span class="kw">false</span>); <span class="cmt">// headers incompletos</span>
-    <span class="var">headersParsed</span> = <span class="kw">true</span>;
-    <span class="cmt">// extrai Content-Length e Expect: 100-continue dos headers</span>
-}
-<span class="kw">if</span> (<span class="var">contentLength</span> > <span class="num">0</span>) {
-    <span class="kw">if</span> (requestBuffer.<span class="fn">length</span>() >= <span class="var">headerEnd</span> + <span class="num">4</span> + <span class="var">contentLength</span>) {
-        <span class="var">requestComplete</span> = <span class="kw">true</span>; <span class="kw">return</span> (<span class="kw">true</span>);
-    }
-    <span class="kw">return</span> (<span class="kw">false</span>);
-}
-<span class="kw">if</span> (requestBuffer.<span class="fn">find</span>(<span class="str">"Transfer-Encoding: chunked"</span>) != <span class="type">std::string</span>::npos) {
-    <span class="kw">if</span> (requestBuffer.<span class="fn">length</span>() >= <span class="num">5</span> &&
-        requestBuffer.<span class="fn">substr</span>(requestBuffer.<span class="fn">length</span>() - <span class="num">5</span>) == <span class="str">"0\r\n\r\n"</span>) {
-        <span class="var">requestComplete</span> = <span class="kw">true</span>; <span class="kw">return</span> (<span class="kw">true</span>);
-    }
-    <span class="kw">return</span> (<span class="kw">false</span>);
-}
-<span class="var">requestComplete</span> = <span class="kw">true</span>; <span class="kw">return</span> (<span class="kw">true</span>); <span class="cmt">// GET, DELETE, etc. — sem body</span></pre>
-      </div>
-      <div class="box box-syntax">
-        <code>requestBuffer.substr(requestBuffer.length() - 5)</code> — extrai os últimos 5 bytes do buffer para verificar o terminador chunked. Verificar o final em vez de buscar <code>"0\r\n\r\n"</code> com find() é mais eficiente para buffers grandes — não percorre o buffer inteiro a cada chamada.
-      </div>
-    </div>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
-      <span class="kw">bool</span> Client::<span class="name">isCgiTimedOut</span>() <span class="kw">const</span>
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Como funciona o timeout de CGI</div>
-        <div class="func-text">Verifica <code>cgiRunning</code> e <code>cgiStartTime != 0</code> (guards). Obtém o tempo atual com <code>time(NULL)</code>. Calcula a diferença. Compara com <code>CGI_TIMEOUT = 120</code> segundos (constante estática definida no header). Chamado pelo WebServ antes de processar os revents do poll — verificação periódica a cada iteração do loop.</div>
-      </div>
-      <div class="box box-syntax">
-        <code>static const time_t CGI_TIMEOUT = 120</code> no header — constante estática de classe. Em C++98 apenas inteiros podem ser inicializados inline no header desta forma. <code>time_t</code> é um typedef para um tipo inteiro (tipicamente <code>long</code>) — por isso funciona. Para tipos não-inteiros seria necessário definir fora da classe.
       </div>
     </div>
   </div>
@@ -537,78 +393,15 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
 
   <div class="func">
     <div class="func-sig">
-      <span class="kw">void</span> WebServ::<span class="name">setupServers</span>()
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">O que faz</div>
-        <div class="func-text">Itera sobre <code>config.getServers()</code>. Para cada ServerConfig chama <code>SocketUtils::createListeningSocket(port)</code> dentro de um <code>try/catch</code> individual. Se o socket for criado com sucesso: salva em <code>serverSockets[listenFd] = port</code> e adiciona ao pollfds com <code>addPollFd(listenFd, POLLIN)</code>. O catch individual garante que uma porta com falha (ex: já em uso) não impede as outras portas de serem abertas.</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
       <span class="kw">void</span> WebServ::<span class="name">run</span>()
     </div>
     <div class="func-body">
       <div class="func-section">
         <div class="func-label">Estrutura do loop — duas fases por iteração</div>
         <div class="func-text">
-          <strong>Fase 1 — Timeout de CGI:</strong> antes de chamar poll(), itera sobre todos os clients e checa <code>isCgiTimedOut()</code>. Se timed out: mata o processo com <code>kill(SIGKILL)</code>, recolhe com <code>waitpid(status, 0)</code> bloqueante, prepara resposta 504, limpa pipes e referências no <code>cgiPipeToClient</code>. Essa fase é independente do poll — ocorre mesmo que não haja atividade de rede.<br><br>
-          <strong>Fase 2 — Processar revents:</strong> a chamada <code>poll(&pollfds[0], pollfds.size(), 1000)</code> bloqueia até 1 segundo. Itera sobre os fds prontos. Categoriza: serverSocket (accept), cgiPipe (cgiRead ou cgiWrite), clienteFd (clientRead, clientWrite ou erro). Após cada handler: <code>break</code>.
+          <strong>Fase 1 — Timeout de CGI:</strong> antes de chamar poll(), itera sobre todos os clients e checa <code>isCgiTimedOut()</code>. Se timed out: mata o processo com <code>kill(SIGKILL)</code>, recolhe com <code>waitpid(status, 0)</code> bloqueante, prepara resposta 504, limpa pipes e referências no <code>cgiPipeToClient</code>.<br><br>
+          <strong>Fase 2 — Processar revents:</strong> a chamada <code>poll(&pollfds[0], pollfds.size(), 1000)</code> bloqueia até 1 segundo. Itera sobre os fds prontos. Categoriza: serverSocket (accept), cgiPipe (cgiRead), clienteFd (clientRead, clientWrite ou erro). Após cada handler: <code>break</code>.
         </div>
-      </div>
-      <div class="code-block">
-        <div class="code-file">WebServ.cpp — run() — chamada do poll e categorização</div>
-        <pre><span class="type">int</span> <span class="var">ret</span> = <span class="fn">poll</span>(<span class="var">pollfds</span>.<span class="fn">empty</span>() ? <span class="kw">NULL</span> : &amp;<span class="var">pollfds</span>[<span class="num">0</span>], <span class="var">pollfds</span>.<span class="fn">size</span>(), <span class="num">1000</span>);
-<span class="cmt">// pollfds.empty() ? NULL : &pollfds[0]  → evita UB de &vector[0] quando vazio</span>
-<span class="kw">if</span> (<span class="var">ret</span> < <span class="num">0</span>) <span class="kw">break</span>; <span class="cmt">// EINTR (sinal) ou erro real → sai do loop</span>
-
-<span class="type">size_t</span> <span class="var">size</span> = <span class="var">pollfds</span>.<span class="fn">size</span>(); <span class="cmt">// captura o tamanho ANTES dos handlers (que podem modificar)</span>
-<span class="kw">for</span> (<span class="type">size_t</span> <span class="var">i</span> = <span class="num">0</span>; <span class="var">i</span> < <span class="var">size</span>; ++<span class="var">i</span>) {
-    <span class="kw">if</span> (<span class="var">pollfds</span>[<span class="var">i</span>].revents == <span class="num">0</span>) <span class="kw">continue</span>;
-    <span class="type">int</span> <span class="var">fd</span> = <span class="var">pollfds</span>[<span class="var">i</span>].fd;
-
-    <span class="kw">if</span> (<span class="var">serverSockets</span>.<span class="fn">find</span>(<span class="var">fd</span>) != <span class="var">serverSockets</span>.<span class="fn">end</span>()) {
-        <span class="fn">acceptNewConnection</span>(<span class="var">fd</span>); <span class="cmt">// fd é um socket de listen</span>
-    }
-    <span class="kw">else if</span> (<span class="var">cgiPipeToClient</span>.<span class="fn">find</span>(<span class="var">fd</span>) != <span class="var">cgiPipeToClient</span>.<span class="fn">end</span>()) {
-        <span class="cmt">// fd é pipeIn ou pipeOut de um CGI</span>
-        <span class="fn">handleCgiRead</span>(<span class="var">fd</span>) <span class="cmt">// ou handleCgiWrite</span>
-        <span class="kw">break</span>;
-    }
-    <span class="kw">else</span> {
-        <span class="cmt">// fd é um socket de cliente</span>
-        <span class="kw">if</span> (revents &amp; POLLIN)  { <span class="fn">handleClientRead</span>(<span class="var">fd</span>);  <span class="kw">break</span>; }
-        <span class="kw">if</span> (revents &amp; POLLOUT) { <span class="fn">handleClientWrite</span>(<span class="var">fd</span>); <span class="kw">break</span>; }
-        <span class="kw">if</span> (revents &amp; (POLLERR|POLLHUP|POLLNVAL)) { <span class="fn">removeClient</span>(<span class="var">fd</span>); <span class="kw">break</span>; }
-    }
-}</pre>
-      </div>
-      <div class="box box-syntax">
-        <code>pollfds.empty() ? NULL : &pollfds[0]</code> — acessar <code>&pollfds[0]</code> quando o vector está vazio é undefined behavior em C++ (equivalente a desreferenciar ponteiro nulo). Sem servidores configurados o vector pode estar vazio. O ternário protege contra esse caso passando NULL ao poll() — que retornará imediatamente por não ter fds para monitorar.
-      </div>
-      <div class="box box-warn">
-        <code>size_t size = pollfds.size()</code> capturado ANTES do loop — não <code>pollfds.size()</code> diretamente no for. Handlers como <code>acceptNewConnection()</code> e <code>removeClient()</code> modificam o vector (push_back / erase). Iterar até <code>pollfds.size()</code> dinâmico causaria UB ou acesso fora dos limites. O <code>break</code> após cada handler garante saída do for antes de continuar — o loop while reinicia com o vector atualizado.
-      </div>
-      <div class="box box-note">
-        <strong>Gestão dos mapas de lookup:</strong> <code>serverSockets[fd] = port</code> mapeia fd de listen para porta. <code>cgiPipeToClient[pipeFd] = clientFd</code> mapeia um pipe de CGI para o fd do cliente dono. Sem esses mapas, ao receber atividade num pipe de CGI não saberíamos para qual cliente entregar a saída.
-      </div>
-    </div>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
-      <span class="kw">static void</span> WebServ::<span class="name">signalHandler</span>(<span class="type">int</span>) &nbsp;&nbsp;&nbsp; <span class="kw">static bool</span> WebServ::<span class="name">isRunning</span>
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Shutdown gracioso via SIGINT (Ctrl+C)</div>
-        <div class="func-text"><code>isRunning</code> é um atributo estático de classe — existe uma única instância compartilhada por todo o programa. O <code>signalHandler</code> é registrado em <code>main()</code> com <code>signal(SIGINT, WebServ::signalHandler)</code>. Ao receber Ctrl+C, o handler seta <code>isRunning = false</code>. Na próxima iteração do while, a condição é false e o loop para. O destrutor do WebServ fecha todos os fds e deleta todos os Clients.</div>
-      </div>
-      <div class="box box-syntax">
-        <code>static bool WebServ::isRunning</code> — atributo estático precisa de definição fora da classe além da declaração no header. Em <code>WebServ.cpp</code>: <code>bool WebServ::isRunning = true;</code>. Sem isso o linker reporta "undefined reference". Atributos estáticos não fazem parte de nenhuma instância — existem independentemente de objetos.
       </div>
     </div>
   </div>
@@ -624,21 +417,6 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
 
   <div class="func">
     <div class="func-sig">
-      <span class="kw">void</span> WebServ::<span class="name">acceptNewConnection</span>(<span class="type">int</span> <span class="param">serverFd</span>)
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">O que faz</div>
-        <div class="func-text">Chama <code>accept(serverFd, &clientAddr, &clientLen)</code>. Retorna o fd do novo socket de cliente. Seta non-blocking. Aumenta buffers do socket novo para 1MB. Cria <code>new Client(clientFd, serverFd)</code> — o <code>serverFd</code> é guardado no Client para identificar qual servidor aceitou a conexão. Adiciona ao map <code>clients</code> e ao <code>pollfds</code> com <code>POLLIN</code>.</div>
-      </div>
-      <div class="box box-note">
-        <code>accept()</code> em modo non-blocking pode retornar -1 com <code>EAGAIN</code> se não houver conexão pendente (race entre poll() indicar pronto e accept() ser chamado). O código verifica <code>if (clientFd >= 0)</code> antes de criar o Client — <code>EAGAIN</code> é descartado silenciosamente.
-      </div>
-    </div>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
       <span class="kw">void</span> WebServ::<span class="name">handleClientRead</span>(<span class="type">int</span> <span class="param">clientFd</span>)
     </div>
     <div class="func-body">
@@ -646,11 +424,7 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
         <div class="func-label">Passo a passo completo</div>
         <div class="func-text">
           <strong>1. recv()</strong> — lê até 65536 bytes. 0 → cliente fechou a conexão → <code>removeClient()</code>. Negativo → erro no socket (ex: conexão resetada pelo peer) → também <code>removeClient()</code>. Positivo → <code>client->appendRequest(buffer, bytesRead)</code> + <code>client->isRequestComplete()</code>.<br><br>
-          <strong>2. isRequestTooLarge()</strong> — verifica limite do body. Se exceder → 413 + POLLOUT.<br><br>
-          <strong>3. 100-Continue</strong> — se headers chegaram, client precisa de 100-continue e ainda não enviamos: seta a resposta "HTTP/1.1 100 Continue\r\n\r\n", seta <code>sending100Continue = true</code>, muda evento para <code>POLLIN | POLLOUT</code> (continua recebendo E envia o 100).<br><br>
-          <strong>4. isRequestComplete()</strong> — se completa: cria <code>HttpRequest</code>, limpa o buffer (<code>clearRequestBuffer()</code>), valida (<code>req.isValid()</code>), chama <code>HttpResponse::generateResponse()</code>.<br><br>
-          <strong>5. needsCgiExec()</strong> — se true: chama <code>CgiHandler::startCgi()</code>, distribui os pipes no <code>cgiPipeToClient</code> e pollfds.<br><br>
-          <strong>6. Resposta normal</strong> — se fileResponse: <code>client->setFileResponse()</code>; senão: <code>client->setResponse()</code>. Muda evento para POLLOUT.
+          <strong>2. isRequestTooLarge()</strong> — verifica limite do body. Se exceder → 413 + POLLOUT.
         </div>
       </div>
       <div class="code-block">
@@ -658,65 +432,19 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
         <pre><span class="kw">if</span> (<span class="var">res</span>.<span class="fn">needsCgiExec</span>()) {
     <span class="type">CgiProcess</span> <span class="var">proc</span> = <span class="type">CgiHandler</span>::<span class="fn">startCgi</span>(...);
     <span class="kw">if</span> (!<span class="var">proc</span>.valid) { <span class="cmt">/* 500 */ return; }</span>
-    <span class="cmt">// copia todo o estado do proc para o Client</span>
+    <span class="cmt">// copia estado do proc para o Client</span>
     <span class="var">client</span>-><span class="var">cgiRunning</span>   = <span class="kw">true</span>;
     <span class="var">client</span>-><span class="var">cgiPid</span>      = <span class="var">proc</span>.pid;
-    <span class="var">client</span>-><span class="var">cgiPipeIn</span>   = <span class="var">proc</span>.pipeIn;
-    <span class="var">client</span>-><span class="var">cgiPipeOut</span>  = <span class="var">proc</span>.pipeOut;
+    <span class="var">client</span>-><span class="var">cgiPipeOut</span>  = <span class="var">proc</span>.pipeOut; <span class="cmt">// só pipeOut — body vai ao CGI via arquivo</span>
     <span class="var">client</span>-><span class="var">cgiTmpFd</span>    = <span class="var">proc</span>.tmpFd;
     <span class="var">client</span>-><span class="var">cgiStartTime</span> = <span class="fn">time</span>(<span class="kw">NULL</span>);
-    <span class="var">client</span>-><span class="var">cgiBody</span>      = <span class="var">req</span>.<span class="fn">getBody</span>();
-    <span class="var">client</span>-><span class="var">cgiBodyDone</span>  = <span class="var">client</span>-><span class="var">cgiBody</span>.<span class="fn">empty</span>();
-    <span class="kw">if</span> (<span class="var">client</span>-><span class="var">cgiBodyDone</span>) {
-        <span class="fn">close</span>(<span class="var">client</span>-><span class="var">cgiPipeIn</span>);  <span class="cmt">// GET: sem body → fecha stdin imediatamente</span>
-        <span class="var">client</span>-><span class="var">cgiPipeIn</span> = -<span class="num">1</span>;
-    } <span class="kw">else</span> {
-        <span class="var">cgiPipeToClient</span>[<span class="var">client</span>-><span class="var">cgiPipeIn</span>] = <span class="var">clientFd</span>; <span class="cmt">// monitorar POLLOUT no pipeIn</span>
-        <span class="fn">addPollFd</span>(<span class="var">client</span>-><span class="var">cgiPipeIn</span>, POLLOUT);
-    }
-    <span class="var">cgiPipeToClient</span>[<span class="var">client</span>-><span class="var">cgiPipeOut</span>] = <span class="var">clientFd</span>; <span class="cmt">// monitorar POLLIN no pipeOut sempre</span>
+    <span class="cmt">// registra o pipeOut no poll — único pipe monitorado</span>
+    <span class="var">cgiPipeToClient</span>[<span class="var">client</span>-><span class="var">cgiPipeOut</span>] = <span class="var">clientFd</span>;
     <span class="fn">addPollFd</span>(<span class="var">client</span>-><span class="var">cgiPipeOut</span>, POLLIN);
 }</pre>
       </div>
       <div class="box box-why">
-        <strong>Por que fechar pipeIn imediatamente se não há body (GET)?</strong> O processo CGI lê stdin até EOF para saber que terminou. Se não fechamos o pipeIn, o CGI ficaria esperando dados que nunca virão — hang indefinido. Fechar o fd do escritor sinaliza EOF para o leitor.
-      </div>
-    </div>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
-      <span class="kw">const</span> <span class="type">ServerConfig</span> &amp;WebServ::<span class="name">getServerForRequest</span>(<span class="kw">const</span> <span class="type">HttpRequest</span> &amp;<span class="param">req</span>, <span class="type">int</span> <span class="param">serverFd</span>)
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Como seleciona o ServerConfig correto</div>
-        <div class="func-text">Recebe o <code>serverFd</code> do Client — o socket de listen por onde aquela conexão entrou — e traduz para a porta real via <code>serverSockets</code>. Filtra os <code>ServerConfig</code> para apenas os que escutam naquela porta; entre eles, lê o header <code>Host</code> da requisição (removendo a parte <code>:porta</code> se presente) e procura um <code>server_name</code> que bata exatamente. Se nenhum bater, usa o primeiro <code>ServerConfig</code> daquela porta como padrão.</div>
-      </div>
-      <div class="code-block">
-        <div class="code-file">WebServ.cpp — getServerForRequest()</div>
-        <pre><span class="type">int</span> <span class="var">port</span> = <span class="num">0</span>;
-<span class="type">std::map</span>&lt;<span class="type">int</span>,<span class="type">int</span>&gt;::<span class="type">const_iterator</span> <span class="var">sIt</span> = serverSockets.<span class="fn">find</span>(<span class="var">serverFd</span>);
-<span class="kw">if</span> (<span class="var">sIt</span> != serverSockets.<span class="fn">end</span>())
-    <span class="var">port</span> = sIt->second;          <span class="cmt">// porta real por onde o cliente entrou</span>
-
-<span class="cmt">// ... extrai host do header Host, sem a parte :porta ...</span>
-
-<span class="type">int</span> <span class="var">defaultServerIdx</span> = -<span class="num">1</span>;
-<span class="kw">for</span> (<span class="type">size_t</span> <span class="var">i</span> = <span class="num">0</span>; <span class="var">i</span> &lt; servers.<span class="fn">size</span>(); ++<span class="var">i</span>) {
-    <span class="kw">if</span> (servers[<span class="var">i</span>].<span class="fn">getListenPort</span>() == <span class="var">port</span>) {   <span class="cmt">// só considera servers dessa porta</span>
-        <span class="kw">if</span> (<span class="var">defaultServerIdx</span> == -<span class="num">1</span>)
-            <span class="var">defaultServerIdx</span> = <span class="var">i</span>;             <span class="cmt">// primeiro da porta = fallback</span>
-        <span class="kw">if</span> (!host.<span class="fn">empty</span>() &amp;&amp; servers[<span class="var">i</span>].<span class="fn">getServerName</span>() == host)
-            <span class="kw">return</span> (servers[<span class="var">i</span>]);          <span class="cmt">// nome bateu — retorna direto</span>
-    }
-}
-<span class="kw">if</span> (<span class="var">defaultServerIdx</span> != -<span class="num">1</span>)
-    <span class="kw">return</span> (servers[<span class="var">defaultServerIdx</span>]);
-<span class="kw">return</span> (servers[<span class="num">0</span>]);                          <span class="cmt">// nenhum server nessa porta — último recurso</span></pre>
-      </div>
-      <div class="box box-flow">
-        Esse mecanismo é o que permite virtual hosting por nome: múltiplas <code>server {}</code> podem compartilhar a mesma porta, diferenciadas só pelo <code>server_name</code>. A porta filtra o subconjunto correto antes mesmo de olhar o <code>Host</code> — então duas portas diferentes nunca se confundem, mesmo que tenham o mesmo <code>server_name</code> configurado.
+        <strong>Sem pipeIn, sem handleCgiWrite().</strong> O body da requisição foi gravado em disco pelo Client durante o <code>recv()</code> (no arquivo <code>reqTmpPath</code>). O <code>CgiHandler::startCgi()</code> abre esse arquivo no filho e faz <code>dup2(bodyFd, STDIN_FILENO)</code> antes do <code>execve()</code> — o processo CGI lê o body diretamente do arquivo, sem que o pai precise enviar nada via pipe. Isso elimina toda a lógica de <code>POLLOUT/pipeIn</code> e simplifica o loop.
       </div>
     </div>
   </div>
@@ -726,23 +454,8 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
 <div class="section" id="s8">
   <div class="sec-head">
     <span class="sec-num">08</span>
-    <span class="sec-title">WebServ — o CGI assíncrono: Write, Read, Finish</span>
+    <span class="sec-title">WebServ — o CGI assíncrono: Read e Finish</span>
     <span class="sec-file">WebServ.cpp</span>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
-      <span class="kw">void</span> WebServ::<span class="name">handleCgiWrite</span>(<span class="type">int</span> <span class="param">pipeFd</span>)
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Envia o body da requisição ao processo CGI via stdin</div>
-        <div class="func-text">Chamada quando poll() indica POLLOUT no pipeIn do CGI. Escreve até 64KB por vez: <code>write(pipeFd, cgiBody.c_str() + cgiBodyWritten, chunkSize)</code>. Atualiza <code>cgiBodyWritten</code>. Quando todo o body foi enviado (<code>cgiBodyWritten >= cgiBody.length()</code>): remove o pipeFd do pollfds e do mapa, fecha o fd, seta <code>cgiBodyDone = true</code>. Fechar o pipeIn sinaliza EOF ao CGI — o processo sabe que pode processar o body.</div>
-      </div>
-      <div class="box box-note">
-        Se <code>write()</code> retornar negativo (EPIPE — processo CGI fechou stdin prematuramente): também fecha e remove o pipe. Não lança exceção — o servidor continua. A saída do CGI ainda pode ter dados no pipeOut que serão lidos pelo handleCgiRead.
-      </div>
-    </div>
   </div>
 
   <div class="func">
@@ -753,55 +466,6 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
       <div class="func-section">
         <div class="func-label">Lê a saída do CGI e acumula no arquivo temporário</div>
         <div class="func-text">Chamada quando poll() indica POLLIN (ou POLLHUP/POLLERR) no pipeOut do CGI. Lê até 64KB: <code>read(pipeFd, buffer, 65536)</code>. Se positivo → <code>write(client->cgiTmpFd, buffer, bytesRead)</code> e incrementa <code>cgiTotalOutput</code>. Se zero ou negativo (EOF ou erro — CGI terminou) → fecha o pipe, remove do mapa e pollfds, chama <code>finishCgi(clientFd)</code>.</div>
-      </div>
-      <div class="box box-note">
-        POLLHUP é incluído nas condições de trigger (<code>POLLIN | POLLHUP | POLLERR</code>) porque no Linux, quando o processo filho fecha seu stdout (ao terminar), o pipeOut pode gerar POLLHUP sem POLLIN. Sem verificar POLLHUP o servidor esperaria para sempre por dados que nunca virão.
-      </div>
-    </div>
-  </div>
-
-  <div class="func">
-    <div class="func-sig">
-      <span class="kw">void</span> WebServ::<span class="name">finishCgi</span>(<span class="type">int</span> <span class="param">clientFd</span>)
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Finaliza o CGI e prepara a resposta para o cliente</div>
-        <div class="func-text"><strong>1.</strong> <code>waitpid(cgiPid, &status, 0)</code> — bloqueante. Nesse ponto a função só é chamada depois que o pipe de saída do CGI já fechou (EOF ou erro em <code>handleCgiRead</code>), então o processo já terminou ou está terminando — a espera resolve essencialmente na hora, sem travar o loop de fato.<br><br>
-        <strong>2.</strong> Verifica o status de saída com <code>WIFSIGNALED(status)</code> e <code>WIFEXITED(status) && WEXITSTATUS(status) != 0</code> — se o processo morreu por sinal ou saiu com código de erro, marca <code>cgiCrashed = true</code>.<br><br>
-        <strong>3.</strong> <code>CgiHandler::finishCgi(cgiTmpFd, cgiTmpPath, cgiTotalOutput)</code> — parseia os headers CGI do arquivo tmp e calcula o offset do body.<br><br>
-        <strong>4.</strong> Se <code>cgiCrashed</code>: ignora qualquer saída parcial que o script tenha produzido e responde 500 Internal Server Error diretamente.<br><br>
-        <strong>5.</strong> Senão, se sucesso: constrói o header HTTP manualmente com <code>ostringstream</code>, chama <code>client->setFileResponse(header, tmpFilePath, bodySize, fileStartOffset, true)</code>. O <code>true</code> = deleteFileOnClose — o tmp será deletado no destrutor do Client.<br><br>
-        <strong>6.</strong> Se falha no parse: 500 Internal Server Error.<br><br>
-        <strong>7.</strong> <code>setPollEvent(clientFd, POLLOUT)</code> — o cliente está pronto para receber a resposta.</div>
-      </div>
-      <div class="code-block">
-        <div class="code-file">WebServ.cpp — finishCgi() — status de saída e decisão de crash</div>
-        <pre><span class="type">int</span> <span class="var">status</span>;
-<span class="fn">waitpid</span>(<span class="var">client</span>-><span class="var">cgiPid</span>, &amp;<span class="var">status</span>, <span class="num">0</span>);
-<span class="var">client</span>-><span class="var">cgiPid</span> = -<span class="num">1</span>;
-
-<span class="kw">bool</span> <span class="var">cgiCrashed</span> = (<span class="fn">WIFSIGNALED</span>(<span class="var">status</span>) || (<span class="fn">WIFEXITED</span>(<span class="var">status</span>) &amp;&amp; <span class="fn">WEXITSTATUS</span>(<span class="var">status</span>) != <span class="num">0</span>));
-
-<span class="type">CgiResult</span> <span class="var">result</span> = <span class="type">CgiHandler</span>::<span class="fn">finishCgi</span>(<span class="var">client</span>-><span class="var">cgiTmpFd</span>, <span class="var">client</span>-><span class="var">cgiTmpPath</span>, <span class="var">client</span>-><span class="var">cgiTotalOutput</span>);
-
-<span class="kw">if</span> (<span class="var">cgiCrashed</span>) {
-    <span class="cmt">// o script morreu — qualquer saída parcial já escrita é descartada</span>
-    <span class="var">client</span>-><span class="fn">setResponse</span>(errRes.<span class="fn">getErrorResponse</span>(<span class="num">500</span>));
-}
-<span class="kw">else if</span> (<span class="var">result</span>.success &amp;&amp; <span class="var">result</span>.useFile) {
-    <span class="cmt">// ... monta header e chama setFileResponse() ...</span>
-}
-<span class="kw">else</span> {
-    <span class="var">client</span>-><span class="fn">setResponse</span>(errRes.<span class="fn">getErrorResponse</span>(<span class="num">500</span>));
-}
-<span class="fn">setPollEvent</span>(<span class="var">clientFd</span>, POLLOUT);</pre>
-      </div>
-      <div class="box box-why">
-        <strong>Por que checar o status de saída em vez de confiar só no conteúdo da saída?</strong> Um script que crasha no meio (ex: uma exceção não tratada) pode ter escrito uma parte válida da resposta antes de morrer — sem essa checagem, o servidor responderia 200 com um corpo incompleto, como se nada tivesse acontecido. Olhando o status de saída do processo, o servidor distingue "terminou normalmente" de "terminou mal" e responde 500 nesse segundo caso, independentemente do que já estava no buffer de saída.
-      </div>
-      <div class="box box-syntax">
-        <code>waitpid(pid, &status, 0)</code> bloqueante — coleta o estado de saída do filho e, junto com ele, as macros <code>WIFSIGNALED</code>/<code>WIFEXITED</code>/<code>WEXITSTATUS</code> decodificam o campo <code>status</code>: se o processo foi terminado por um sinal, se saiu normalmente, e qual foi o código de saída. Sem <code>waitpid()</code>, o processo filho ficaria em estado "zombie" — não usa CPU/RAM mas ocupa uma entrada na tabela de processos.
       </div>
     </div>
   </div>
@@ -817,43 +481,6 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
 
   <div class="func">
     <div class="func-sig">
-      <span class="kw">void</span> WebServ::<span class="name">handleClientWrite</span>(<span class="type">int</span> <span class="param">clientFd</span>)
-    </div>
-    <div class="func-body">
-      <div class="func-section">
-        <div class="func-label">Passo a passo</div>
-        <div class="func-text">
-          <strong>1.</strong> Verifica <code>getResponseRemaining()</code>. Se 0: caso especial de 100-Continue (reseta estado e volta para POLLIN) ou chama <code>removeClient()</code>.<br><br>
-          <strong>2.</strong> Prepara buffer de envio: <code>toRead = min(remaining, 65536)</code>. Chama <code>client->getResponseData(sendBuf, toRead)</code> — preenche o buffer com os próximos bytes (do cache em memória ou lendo do arquivo).<br><br>
-          <strong>3.</strong> Se <code>getResponseData()</code> retornar 0 (arquivo esgotado prematuramente): <code>removeClient()</code>.<br><br>
-          <strong>4.</strong> <code>send(clientFd, sendBuf, dataLen, 0)</code>. Positivo → <code>advanceResponseOffset(bytesSent)</code>. Se <code>isResponseComplete()</code>: fecha ou reseta para 100-Continue. Negativo → <code>removeClient()</code>.
-        </div>
-      </div>
-      <div class="func-section">
-        <div class="func-label">O ciclo de 100-Continue</div>
-        <div class="func-text">Quando um cliente manda <code>Expect: 100-continue</code>, o fluxo é: recv headers → detecta need100Continue → manda "HTTP/1.1 100 Continue\r\n\r\n" com <code>sending100Continue = true</code> e evento <code>POLLIN | POLLOUT</code> → handleClientWrite envia o 100 → quando enviado e <code>sending100Continue == true</code>: seta evento de volta para <code>POLLIN</code> → cliente manda o body completo → recv detecta complete → processa normalmente.</div>
-      </div>
-      <div class="code-block">
-        <div class="code-file">WebServ.cpp — handleClientWrite() — 100-Continue e conclusão</div>
-        <pre><span class="kw">if</span> (<span class="var">remaining</span> == <span class="num">0</span>) {
-    <span class="kw">if</span> (<span class="var">client</span>-><span class="var">sending100Continue</span>) {
-        <span class="var">client</span>-><span class="var">sending100Continue</span> = <span class="kw">false</span>;
-        <span class="var">client</span>-><span class="fn">setResponse</span>(<span class="str">""</span>);           <span class="cmt">// limpa o buffer do 100-Continue</span>
-        <span class="fn">setPollEvent</span>(<span class="var">clientFd</span>, POLLIN);  <span class="cmt">// volta a escutar o body do cliente</span>
-        <span class="kw">return</span>;
-    }
-    <span class="fn">removeClient</span>(<span class="var">clientFd</span>);             <span class="cmt">// resposta enviada → fecha conexão</span>
-    <span class="kw">return</span>;
-}
-<span class="cmt">// ... getResponseData() → send() → advanceResponseOffset() ...</span>
-<span class="kw">if</span> (<span class="var">client</span>-><span class="fn">isResponseComplete</span>()) {
-    <span class="kw">if</span> (<span class="var">client</span>-><span class="var">sending100Continue</span>) {  <span class="cmt">// mesma lógica do caso remaining==0</span>
-        <span class="var">client</span>-><span class="var">sending100Continue</span> = <span class="kw">false</span>;
-        <span class="fn">setPollEvent</span>(<span class="var">clientFd</span>, POLLIN);
-    } <span class="kw">else</span>
-        <span class="fn">removeClient</span>(<span class="var">clientFd</span>);
-}</pre>
-      </div>
     </div>
   </div>
 
@@ -916,7 +543,7 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
       <tr><td>pollfds</td><td>vector&lt;pollfd&gt;</td><td>Todos os fds monitorados: sockets de listen + sockets de clientes + pipes de CGI</td><td>addPollFd / removePollFd / setPollEvent</td></tr>
       <tr><td>serverSockets</td><td>map&lt;int,int&gt;</td><td>listenFd → porta. Identifica fds de listen vs clientes no loop</td><td>setupServers()</td></tr>
       <tr><td>clients</td><td>map&lt;int,Client*&gt;</td><td>clientFd → objeto Client. Dono dos ponteiros</td><td>acceptNewConnection / removeClient</td></tr>
-      <tr><td>cgiPipeToClient</td><td>map&lt;int,int&gt;</td><td>pipeFd → clientFd. Liga pipe de CGI ao cliente dono</td><td>handleClientRead / handleCgiRead / handleCgiWrite</td></tr>
+      <tr><td>cgiPipeToClient</td><td>map&lt;int,int&gt;</td><td>pipeFd → clientFd. Liga pipe de CGI ao cliente dono</td><td>handleClientRead / handleCgiRead</td></tr>
       <tr><td>sessions</td><td>map&lt;string,map&lt;string,string&gt;&gt;</td><td>sessionId → {chave: valor}. Sessões do bônus. Passado por ref ao generateResponse</td><td>HttpResponse::generateResponse (via setSessionData)</td></tr>
       <tr><td>isRunning</td><td>static bool</td><td>Flag de shutdown. false = loop para</td><td>signalHandler(SIGINT)</td></tr>
       <tr><td>config</td><td>Config&amp;</td><td>Referência à Config do main. Lida em setupServers e getServerForRequest</td><td>nunca modificado</td></tr>
@@ -928,12 +555,9 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
     <tbody>
       <tr><td>cgiRunning</td><td>bool</td><td>false → true em handleClientRead. false em finishCgi ou removeClient</td></tr>
       <tr><td>cgiPid</td><td>pid_t</td><td>-1 → pid real em handleClientRead. -1 em finishCgi após waitpid</td></tr>
-      <tr><td>cgiPipeIn</td><td>int</td><td>-1 → fd em handleClientRead. -1 após close em handleCgiWrite ou removeClient</td></tr>
       <tr><td>cgiPipeOut</td><td>int</td><td>-1 → fd em handleClientRead. -1 após close em handleCgiRead</td></tr>
       <tr><td>cgiTmpFd</td><td>int</td><td>-1 → fd aberto em startCgi. passado para finishCgi, fechado lá</td></tr>
-      <tr><td>cgiTmpPath</td><td>char[64]</td><td>vazio → path preenchido em startCgi. unlink no destrutor</td></tr>
-      <tr><td>cgiBody</td><td>string</td><td>vazio → req.getBody() em handleClientRead. consumido por handleCgiWrite</td></tr>
-      <tr><td>cgiBodyWritten</td><td>size_t</td><td>0 → incrementa em handleCgiWrite. total = cgiBody.length()</td></tr>
+      <tr><td>cgiTmpPath</td><td>char[64]</td><td>vazio → path preenchido em startCgi. std::remove() no destrutor</td></tr>
       <tr><td>cgiTotalOutput</td><td>size_t</td><td>0 → incrementa em handleCgiRead. total bytes no tmpFile</td></tr>
       <tr><td>cgiStartTime</td><td>time_t</td><td>0 → time(NULL) em handleClientRead. verificado por isCgiTimedOut()</td></tr>
     </tbody>

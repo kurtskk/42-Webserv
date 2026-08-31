@@ -1,4 +1,4 @@
-*Este projeto foi criado como parte do currículo da 42 por bolegari, jose-cad, kgagliar.*
+*Este projeto foi criado como parte do currículo da 42 por jose-cad.*
 
 ---
 # Webserv - Servidor HTTP em C++98
@@ -288,20 +288,20 @@ Webserv usa uma única chamada `poll()` para multiplex I/O em todos os descritor
 
 ### Divisão de Módulos
 
-**Módulo Config (bolegari)**
+**Módulo Config**
 - Faz parsing de `webserv.conf` usando tokenizador customizado
 - Valida diretivas e constrói configuração hierárquica
 - Suporta blocos server/location aninhados
 - Retorna objetos `ServerConfig` estruturados
 
-**Módulo HTTP (kgagliar)**
+**Módulo HTTP**
 - Faz parsing de requisições HTTP brutas de buffers de socket
 - Gera headers de resposta HTTP corretos
 - Manipula execução CGI e saída de script
 - Gerencia dados de cookies e sessão
 - Implementa todos os códigos de status e páginas de erro
 
-**Módulo Server (jose-cad)**
+**Módulo Server**
 - Implementa event loop baseado em poll()
 - Gerencia criação e binding de socket
 - Manipula ciclo de vida de conexão de cliente
@@ -429,17 +429,7 @@ Este projeto utilizou assistência de IA para:
 5. **Automação de Testes** - Criação de scripts de teste abrangentes, scripts CGI de demonstração, verificação de recursos
 6. **Code Review** - Verificação de conformidade C++98, correção de I/O não-bloqueante, gerenciamento de memória
 
-A IA serviu como um consultor técnico e gerador de código, enquanto os desenvolvedores mantiveram compreensão total e controle da implementação final.
-
----
-
-## Contribuições dos Autores
-
-| Nome | Módulo | Responsabilidades |
-|------|--------|------------------|
-| **bolegari** | Config | Parsing de arquivo de configuração, validação de diretivas, hierarquia de blocos |
-| **kgagliar** | HTTP | Parsing de requisição/resposta, execução CGI, tratamento de erro, sessões |
-| **jose-cad** | Server | Event loop, gerenciamento de socket, ciclo de vida de cliente, I/O de pipe |
+A IA serviu como um consultor técnico e gerador de testes/frontend, enquanto os desenvolvedores mantiveram compreensão total e controle da implementação final.
 
 ---
 

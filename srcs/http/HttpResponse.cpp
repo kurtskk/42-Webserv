@@ -1,11 +1,14 @@
+#include <cstdio>
 #include "HttpResponse.hpp"
 #include "CgiHandler.hpp"
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <time.h>
 
 HttpResponse::HttpResponse() :
@@ -107,7 +110,7 @@ const std::string &HttpResponse::getCgiExecPath() const {
 	return (cgiExecPath);
 }
 
-std::string HttpResponse::generateResponse(const HttpRequest &req, const ServerConfig &serverConfig, std::map<std::string, std::map<std::string, std::string> > &sessions) {
+std::string HttpResponse::generateResponse(const HttpRequest &req, const ServerConfig &serverConfig, std::map<std::string, std::map<std::string, std::string> > &sessions, const std::string &reqBodyPath, size_t bodySize) {
 	const LocationConfig *matchedLoc = NULL;
 	std::string uri = req.getUri();
 	std::string searchUri = uri;
@@ -121,7 +124,19 @@ std::string HttpResponse::generateResponse(const HttpRequest &req, const ServerC
 		}
 		else if (req.getMethod() == "POST") {
 			std::string username = "Anonymous";
-			std::string reqBody = req.getBody();
+			std::string reqBody = "";
+			if (!reqBodyPath.empty() && bodySize > 0) {
+				int fd = open(reqBodyPath.c_str(), O_RDONLY);
+				if (fd >= 0) {
+					char buf[1024];
+					ssize_t n = read(fd, buf, sizeof(buf) - 1);
+					if (n > 0) {
+						buf[n] = '\0';
+						reqBody = buf;
+					}
+					close(fd);
+				}
+			}
 			size_t pos = reqBody.find("username=");
 			if (pos != std::string::npos) {
 				size_t ampersand = reqBody.find("&", pos);
@@ -129,7 +144,7 @@ std::string HttpResponse::generateResponse(const HttpRequest &req, const ServerC
 				username = reqBody.substr(pos + 9, ampersand - (pos + 9));
 			}
 			std::ostringstream sid;
-			sid << "sess_" << time(NULL);
+			sid << "sess_" << SocketUtils::getCurrentTime();
 			std::string sessionId = sid.str();
 			setSessionData(sessions, sessionId, "user", username);
 			addCookie("session_id=" + sessionId + "; Path=/; HttpOnly");
@@ -230,7 +245,7 @@ std::string HttpResponse::generateResponse(const HttpRequest &req, const ServerC
 			targetFile += "/" + matchedLoc->getIndex();
 	}
 	size_t maxBody = matchedLoc->getClientMaxBodySize() > 0 ? matchedLoc->getClientMaxBodySize() : serverConfig.getClientMaxBodySize();
-	if (req.getBody().length() > maxBody) {
+	if (bodySize > maxBody) {
 		statusCode = "413";
 		statusMessage = "Payload Too Large";
 		body = "<html><body><h1>413 Payload Too Large</h1></body></html>";
@@ -238,15 +253,17 @@ std::string HttpResponse::generateResponse(const HttpRequest &req, const ServerC
 		return (buildResponseString());
 	}
 	if (!matchedLoc->getCgiExtension().empty() && targetFile.find(matchedLoc->getCgiExtension()) != std::string::npos) {
-		needsCgi = true;
-		cgiScriptPath = targetFile;
-		cgiExecPath = matchedLoc->getCgiPath();
-		return ("");
+		if (req.getMethod() == "POST" || matchedLoc->getCgiExtension() != ".bla") {
+			needsCgi = true;
+			cgiScriptPath = targetFile;
+			cgiExecPath = matchedLoc->getCgiPath();
+			return ("");
+		}
 	}
 	if (req.getMethod() == "GET")
 		handleGet(req, serverConfig, targetFile, matchedLoc);
 	else if (req.getMethod() == "POST")
-		handlePost(req, serverConfig, targetFile, matchedLoc);
+		handlePost(req, serverConfig, targetFile, matchedLoc, reqBodyPath, bodySize);
 	else if (req.getMethod() == "DELETE")
 		handleDelete(req, serverConfig, targetFile);
 	else
@@ -304,72 +321,106 @@ void HttpResponse::handleGet(const HttpRequest &, const ServerConfig &serverConf
 		setErrorResponse(404, &serverConfig);
 }
 
-void HttpResponse::handlePost(const HttpRequest &req, const ServerConfig &, const std::string &, const LocationConfig *matchedLoc) {
+void HttpResponse::handlePost(const HttpRequest &req, const ServerConfig &, const std::string &, const LocationConfig *matchedLoc, const std::string &reqBodyPath, size_t bodySize) {
 	const std::map<std::string, std::string> &headers = req.getHeaders();
 	std::map<std::string, std::string>::const_iterator it = headers.find("Content-Type");
 	if (it == headers.end())
 		it = headers.find("Content-type");
-	if (it != headers.end() && it->second.find("multipart/form-data") != std::string::npos) {
+	
+	if (it != headers.end() && it->second.find("multipart/form-data") != std::string::npos && !reqBodyPath.empty() && bodySize > 0) {
 		std::string boundary;
 		size_t pos = it->second.find("boundary=");
 		if (pos != std::string::npos)
 			boundary = "--" + it->second.substr(pos + 9);
 		if (!boundary.empty()) {
-			const std::string &reqBody = req.getBody();
-			size_t fileStart = reqBody.find(boundary);
-			if (fileStart != std::string::npos) {
-				fileStart += boundary.length();
-				fileStart = reqBody.find("\r\n\r\n", fileStart);
-				if (fileStart != std::string::npos) {
-					fileStart += 4;
-					size_t fileEnd = reqBody.find(boundary, fileStart);
-					if (fileEnd != std::string::npos) {
-						if (fileEnd >= 2)
-							fileEnd -= 2;
-						std::string filename = "uploaded_file";
-						size_t headerStart = reqBody.find(boundary) + boundary.length();
-						std::string partHeaders = reqBody.substr(headerStart, fileStart - headerStart);
-						size_t fnPos = partHeaders.find("filename=\"");
-						if (fnPos != std::string::npos) {
-							fnPos += 10;
-							size_t fnEndPos = partHeaders.find("\"", fnPos);
-							if (fnEndPos != std::string::npos)
-								filename = partHeaders.substr(fnPos, fnEndPos - fnPos);
-						}
-						std::string uploadDir = "upload_store";
-						if (matchedLoc && !matchedLoc->getUploadStore().empty())
-							uploadDir = matchedLoc->getUploadStore();
-						struct stat st;
-						if (stat(uploadDir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
-							setErrorResponse(500);
-							return;
-						}
-						std::string savePath = uploadDir + "/" + filename;
-						std::ofstream ofs(savePath.c_str(), std::ios::out | std::ios::binary);
-						if (ofs) {
-							ofs.write(reqBody.c_str() + fileStart, fileEnd - fileStart);
-							ofs.close();
-							statusCode = "201";
-							statusMessage = "Created";
-							this->body = "<html><body><h1>File uploaded successfully</h1></body></html>";
-							return;
-						}
-						else {
-							setErrorResponse(500);
-							return;
+			int inFd = open(reqBodyPath.c_str(), O_RDONLY);
+			if (inFd >= 0) {
+				char headBuf[8192];
+				ssize_t n = read(inFd, headBuf, sizeof(headBuf) - 1);
+				if (n > 0) {
+					headBuf[n] = '\0';
+					std::string headStr(headBuf, n);
+					size_t fileStart = headStr.find(boundary);
+					if (fileStart != std::string::npos) {
+						fileStart += boundary.length();
+						fileStart = headStr.find("\r\n\r\n", fileStart);
+						if (fileStart != std::string::npos) {
+							fileStart += 4;
+							std::string filename = "uploaded_file";
+							size_t headerStart = headStr.find(boundary) + boundary.length();
+							std::string partHeaders = headStr.substr(headerStart, fileStart - headerStart);
+							size_t fnPos = partHeaders.find("filename=\"");
+							if (fnPos != std::string::npos) {
+								fnPos += 10;
+								size_t fnEndPos = partHeaders.find("\"", fnPos);
+								if (fnEndPos != std::string::npos)
+									filename = partHeaders.substr(fnPos, fnEndPos - fnPos);
+							}
+							std::string uploadDir = "upload_store";
+							if (matchedLoc && !matchedLoc->getUploadStore().empty())
+								uploadDir = matchedLoc->getUploadStore();
+							
+							struct stat st;
+							if (stat(uploadDir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
+								close(inFd);
+								setErrorResponse(500);
+								return;
+							}
+							std::string savePath = uploadDir + "/" + filename;
+							int outFd = open(savePath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+							if (outFd >= 0) {
+								// Re-abrir o arquivo para voltar ao início, já que lseek é proibido
+								close(inFd);
+								inFd = open(reqBodyPath.c_str(), O_RDONLY);
+								
+								// Avançar até o fileStart usando read (simulando lseek)
+								size_t toSkip = fileStart;
+								char skipBuf[8192];
+								while (toSkip > 0) {
+									size_t readSize = (toSkip > sizeof(skipBuf)) ? sizeof(skipBuf) : toSkip;
+									ssize_t r = read(inFd, skipBuf, readSize);
+									if (r <= 0) break;
+									toSkip -= r;
+								}
+								
+								// We must not write the trailing boundary.
+								// A simple way: find file size minus boundary length approx.
+								// The boundary at the end is "\r\n--boundary--\r\n" which is around boundary.length() + 8 bytes
+								size_t boundaryTail = boundary.length() + 8; 
+								size_t toWrite = (bodySize > fileStart + boundaryTail) ? bodySize - fileStart - boundaryTail : 0;
+								
+								char buf[65536];
+								while (toWrite > 0) {
+									size_t readSize = (toWrite > sizeof(buf)) ? sizeof(buf) : toWrite;
+									ssize_t r = read(inFd, buf, readSize);
+									if (r <= 0) break;
+									write(outFd, buf, r);
+									toWrite -= r;
+								}
+								close(outFd);
+								close(inFd);
+								statusCode = "201";
+								statusMessage = "Created";
+								this->body = "<html><body><h1>File uploaded successfully</h1></body></html>";
+								return;
+							}
 						}
 					}
 				}
+				close(inFd);
 			}
 		}
 	}
 	statusCode = "201";
 	statusMessage = "Created";
-	this->body = "Received POST data: \n" + req.getBody();
+	this->body = "Received POST data length: ";
+	std::ostringstream ss;
+	ss << bodySize;
+	this->body += ss.str();
 }
 
 void HttpResponse::handleDelete(const HttpRequest &, const ServerConfig &serverConfig, const std::string &targetFile) {
-	if (unlink(targetFile.c_str()) == 0) {
+	if (std::remove(targetFile.c_str()) == 0) {
 		statusCode = "200";
 		statusMessage = "OK";
 		body = "<html><body><h1>File Deleted Successfully</h1></body></html>";

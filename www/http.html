@@ -653,7 +653,7 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
     <div class="func-body">
       <div class="func-section">
         <div class="func-label">O que faz — mais simples das 3</div>
-        <div class="func-text">Chama <code>unlink(targetFile.c_str())</code>. <code>unlink()</code> é a syscall POSIX para remover um arquivo do sistema de arquivos. Retorna 0 em sucesso → 200 OK. Retorna -1 em falha (arquivo não existe, permissão negada) → 404 Not Found. Não distingue permissão de inexistência — ambos viram 404.</div>
+        <div class="func-text">Chama <code>std::remove(targetFile.c_str())</code>. <code>std::remove()</code> é a função da biblioteca padrão C++ (de <code>&lt;cstdio&gt;</code>) para remover um arquivo do sistema de arquivos. É equivalente à syscall <code>unlink()</code> em POSIX, mas é a alternativa permitida pelas regras do subject da 42. Retorna 0 em sucesso → 200 OK. Retorna valor não-zero em falha (arquivo não existe, permissão negada) → 404 Not Found.</div>
       </div>
     </div>
   </div>
@@ -786,28 +786,33 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
 
   <div class="func">
     <div class="func-sig">
-      <span class="type">CgiProcess</span> CgiHandler::<span class="name">startCgi</span>(<span class="param">cgiPath</span>, <span class="param">scriptFile</span>, <span class="param">req</span>, <span class="param">loc</span>)
+      <span class="type">CgiProcess</span> CgiHandler::<span class="name">startCgi</span>(<span class="param">cgiPath</span>, <span class="param">scriptFile</span>, <span class="param">req</span>, <span class="param">reqBodyPath</span>, <span class="param">bodySize</span>)
     </div>
     <div class="func-body">
       <div class="func-section">
         <div class="func-label">Sequência completa antes do fork</div>
-        <div class="func-text"><strong>1.</strong> Cria dois pipes: <code>pipeIn[2]</code> (servidor → CGI, stdin do CGI) e <code>pipeOut[2]</code> (CGI → servidor, stdout do CGI).<br>
-        <strong>2.</strong> Chama <code>buildEnvp()</code> para montar o array de ambiente.<br>
-        <strong>3.</strong> Cria o arquivo temporário com nome único: <code>/tmp/webserv_cgi_PID_TIME_COUNTER</code>. Usa um <code>static unsigned int tmpCounter</code> para garantir unicidade mesmo com múltiplos CGIs no mesmo segundo. Abre com <code>O_RDWR | O_CREAT | O_EXCL</code> — <code>O_EXCL</code> garante que falha se o arquivo já existir (proteção contra race condition).
+        <div class="func-text"><strong>1.</strong> Cria <strong>apenas um pipe</strong>: <code>pipeOut[2]</code> (CGI → servidor, stdout do CGI). O body da requisição <strong>não é enviado por pipe</strong> — já está gravado em disco num arquivo temporário (<code>reqBodyPath</code>) pelo Client durante o recebimento da requisição.<br>
+        <strong>2.</strong> Chama <code>buildEnvp()</code> para montar o array de ambiente, incluindo <code>CONTENT_LENGTH</code> com o valor de <code>bodySize</code>.<br>
+        <strong>3.</strong> Cria o arquivo temporário de saída com nome único: <code>/tmp/webserv_cgi_PID_TIME_COUNTER</code>. Usa um <code>static unsigned int tmpCounter</code> para garantir unicidade mesmo com múltiplos CGIs no mesmo segundo. Abre com <code>O_RDWR | O_CREAT | O_EXCL</code> — <code>O_EXCL</code> garante que falha se o arquivo já existir (proteção contra race condition).
         </div>
       </div>
       <div class="func-section">
         <div class="func-label">O processo filho (pid == 0)</div>
-        <div class="func-text">Fecha as pontas do pipe que não usa. <code>dup2(pipeIn[0], STDIN_FILENO)</code> — o stdin do filho passa a ser a ponta de leitura do pipeIn. <code>dup2(pipeOut[1], STDOUT_FILENO)</code> — o stdout do filho passa a ser a ponta de escrita do pipeOut. Fecha os fds originais (não precisam mais deles — estão duplicados). Chama <code>execve()</code> com o interpretador e o script. Se execve falhar → escreve "Status: 500\r\n\r\n" no stdout (que agora é o pipe) e chama <code>_exit(1)</code>.</div>
+        <div class="func-text">Fecha a ponta de leitura do pipeOut (é do pai). Se <code>reqBodyPath</code> não for vazio, abre o arquivo do body em disco com <code>open(reqBodyPath, O_RDONLY)</code> e chama <code>dup2(bodyFd, STDIN_FILENO)</code> — o stdin do processo CGI passa a ser o arquivo em disco, sem precisar de pipe de entrada. Em seguida, <code>dup2(pipeOut[1], STDOUT_FILENO)</code> redireciona o stdout para o pipe de saída. Fecha os fds originais. Chama <code>execve()</code>. Se falhar → escreve "Status: 500\r\n\r\n" e chama <code>_exit(1)</code>.</div>
       </div>
       <div class="code-block">
         <div class="code-file">CgiHandler.cpp — startCgi() — processo filho</div>
         <pre><span class="kw">if</span> (<span class="var">pid</span> == <span class="num">0</span>) {                        <span class="cmt">// FILHO</span>
-    <span class="fn">close</span>(<span class="var">pipeIn</span>[<span class="num">1</span>]);                   <span class="cmt">// fecha a ponta de escrita do pipeIn (é do pai)</span>
     <span class="fn">close</span>(<span class="var">pipeOut</span>[<span class="num">0</span>]);                  <span class="cmt">// fecha a ponta de leitura do pipeOut (é do pai)</span>
-    <span class="fn">dup2</span>(<span class="var">pipeIn</span>[<span class="num">0</span>],  STDIN_FILENO);    <span class="cmt">// stdin = leitura do pipeIn</span>
+    <span class="type">int</span> <span class="var">bodyFd</span> = -<span class="num">1</span>;
+    <span class="kw">if</span> (!<span class="var">reqBodyPath</span>.<span class="fn">empty</span>()) {
+        <span class="var">bodyFd</span> = <span class="fn">open</span>(<span class="var">reqBodyPath</span>.<span class="fn">c_str</span>(), O_RDONLY);
+        <span class="kw">if</span> (<span class="var">bodyFd</span> >= <span class="num">0</span>) {
+            <span class="fn">dup2</span>(<span class="var">bodyFd</span>, STDIN_FILENO); <span class="cmt">// stdin = arquivo do body em disco</span>
+            <span class="fn">close</span>(<span class="var">bodyFd</span>);
+        }
+    }
     <span class="fn">dup2</span>(<span class="var">pipeOut</span>[<span class="num">1</span>], STDOUT_FILENO);   <span class="cmt">// stdout = escrita do pipeOut</span>
-    <span class="fn">close</span>(<span class="var">pipeIn</span>[<span class="num">0</span>]);                   <span class="cmt">// fecha fd original (dup2 criou cópia)</span>
     <span class="fn">close</span>(<span class="var">pipeOut</span>[<span class="num">1</span>]);
     <span class="type">char</span> *<span class="var">argv</span>[] = { <span class="var">arg0</span>, <span class="var">arg1</span>, <span class="kw">NULL</span> }; <span class="cmt">// ["/usr/bin/python3", "script.py", NULL]</span>
     <span class="fn">execve</span>(<span class="var">cgiPath</span>.<span class="fn">c_str</span>(), <span class="var">argv</span>, &amp;<span class="var">envp</span>[<span class="num">0</span>]);
@@ -817,10 +822,13 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
       </div>
       <div class="func-section">
         <div class="func-label">O processo pai — o que faz após o fork</div>
-        <div class="func-text">Fecha as pontas do pipe que são do filho (<code>pipeIn[0]</code>, <code>pipeOut[1]</code>). Libera o envp (<code>freeEnvp()</code>) — no filho o execve já substituiu o processo, no pai não é mais necessário. Seta pipeIn[1] e pipeOut[0] como non-blocking com <code>fcntl(fd, F_SETFL, O_NONBLOCK)</code>. Preenche e retorna a struct <code>CgiProcess</code> com valid=true.</div>
+        <div class="func-text">Fecha a ponta de escrita do pipeOut (<code>pipeOut[1]</code>) — só o filho escreve nele. Libera o envp (<code>freeEnvp()</code>). Seta <code>pipeOut[0]</code> como non-blocking com <code>fcntl(fd, F_SETFL, O_NONBLOCK)</code>. Preenche e retorna a struct <code>CgiProcess</code> com valid=true. Não há <code>pipeIn</code> — o body foi entregue ao filho via arquivo em disco, sem necessidade de escrever no stdin por poll.</div>
+      </div>
+      <div class="box box-why">
+        Usar o arquivo em disco (<code>reqBodyPath</code>) em vez de um pipe de entrada elimina a necessidade de monitorar um <code>pipeIn</code> no loop do poll() — não há mais <code>handleCgiWrite()</code>. O arquivo já existe completo antes do fork, o processo filho abre-o e lê diretamente. Isso simplifica a máquina de estados e evita que o pai precise alimentar o stdin do filho em chunks não-bloqueantes.
       </div>
       <div class="box box-syntax">
-        <strong><code>dup2(oldfd, newfd)</code></strong> — duplica <code>oldfd</code> para o número <code>newfd</code>. Se <code>newfd</code> já estava aberto, fecha-o primeiro. Após <code>dup2(pipeIn[0], STDIN_FILENO)</code>, tanto <code>pipeIn[0]</code> quanto <code>STDIN_FILENO(0)</code> apontam para a mesma ponta do pipe. O <code>close(pipeIn[0])</code> depois remove o fd original, deixando só o STDIN_FILENO — que é o que o execve usa.
+        <strong><code>dup2(oldfd, newfd)</code></strong> — duplica <code>oldfd</code> para o número <code>newfd</code>. Se <code>newfd</code> já estava aberto, fecha-o primeiro. Após <code>dup2(bodyFd, STDIN_FILENO)</code>, tanto <code>bodyFd</code> quanto <code>STDIN_FILENO(0)</code> apontam para o mesmo arquivo em disco. O <code>close(bodyFd)</code> depois remove o fd original, deixando só o STDIN_FILENO — que é o que o execve usa.
       </div>
       <div class="box box-syntax">
         <strong><code>_exit(1)</code> vs <code>exit(1)</code></strong> — <code>exit()</code> chama os destructors de objetos estáticos, flush dos buffers e handlers registrados com <code>atexit()</code>. No processo filho após fork, isso poderia fechar fds que o pai ainda usa ou dar flush duplo. <code>_exit()</code> termina imediatamente sem nada disso — é o correto em processos filhos após fork.
@@ -851,7 +859,7 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
       </div>
       <div class="func-section">
         <div class="func-label">Por que fecha e reabre o tmpFd</div>
-        <div class="func-text">O tmpFd foi aberto em modo <code>O_RDWR</code> e estava sendo usado para escrita (<code>write(tmpFd, ...)</code> em <code>handleCgiRead()</code>). O cursor de arquivo está no final. Para ler do início, seria possível usar <code>lseek(tmpFd, 0, SEEK_SET)</code>. O código opta por fechar e reabrir em <code>O_RDONLY</code> — mais explícito e sem ambiguidade sobre a posição do cursor.</div>
+        <div class="func-text">O tmpFd foi aberto em modo <code>O_RDWR</code> e estava sendo usado para escrita (<code>write(tmpFd, ...)</code> em <code>handleCgiRead()</code>). O cursor de arquivo está no final. Fechar e reabrir em <code>O_RDONLY</code> reposiciona o cursor no início de forma explícita — e também é a alternativa obrigatória pois <code>lseek()</code> é uma função proibida pelo subject da 42. O <code>close()</code> do fd original seguido de <code>open(tmpPath, O_RDONLY)</code> garante que a leitura começa exatamente do byte 0.</div>
       </div>
       <div class="func-section">
         <div class="func-label">Estratégia de leitura dos headers CGI</div>
@@ -871,13 +879,13 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
     <span class="var">bodyOffset</span> = <span class="var">headerEnd</span> + <span class="var">headerSepLen</span>; <span class="cmt">// início do body no arquivo</span>
 }
 <span class="var">result</span>.bodySize = totalOutput > <span class="var">bodyOffset</span> ? totalOutput - <span class="var">bodyOffset</span> : <span class="num">0</span>;
-<span class="var">result</span>.fileStartOffset = <span class="var">bodyOffset</span>; <span class="cmt">// o Client vai lseek para cá antes de ler</span>
+<span class="var">result</span>.fileStartOffset = <span class="var">bodyOffset</span>; <span class="cmt">// o Client vai pular esses bytes via read() antes de servir</span>
 <span class="var">result</span>.useFile = <span class="kw">true</span>;
 <span class="var">result</span>.tmpFilePath = <span class="var">tmpPath</span>;</pre>
       </div>
       <div class="func-section">
         <div class="func-label">O que o WebServ faz com o CgiResult</div>
-        <div class="func-text">Usa <code>result.statusCode</code> e <code>result.contentType</code> para chamar <code>client->setFileResponse(header, tmpFilePath, bodySize)</code> com <code>fileStartOffset</code>. O Client abre o tmpFile, faz <code>lseek(fd, fileStartOffset, SEEK_SET)</code> para pular os headers CGI e começa a ler o body a partir daí. O arquivo temporário é deletado no destrutor do Client com <code>unlink(tmpPath)</code>.</div>
+        <div class="func-text">Usa <code>result.statusCode</code> e <code>result.contentType</code> para chamar <code>client->setFileResponse(header, tmpFilePath, bodySize, fileStartOffset, true)</code>. O Client, ao servir, lê o arquivo temporário pulando os primeiros <code>fileStartOffset</code> bytes (os headers CGI) via loop de <code>read()</code> — sem usar <code>lseek()</code>, que é proibido pelo subject da 42. O arquivo temporário é deletado no destrutor do Client com <code>std::remove(tmpPath)</code>.</div>
       </div>
     </div>
   </div>
@@ -960,9 +968,7 @@ table.detail td:first-child { font-family: var(--mono); font-size: .75rem; color
         <span class="arr">→</span>
         <span class="ch">buildEnvp() + fork() + dup2() + execve()</span>
         <span class="arr">→</span>
-        <span class="ch">pipes entram no pollfds</span>
-        <span class="arr">→</span>
-        <span class="ch">handleCgiWrite() → write(body ao stdin)</span>
+        <span class="ch">só pipeOut entra no pollfds</span>
         <span class="arr">→</span>
         <span class="ch">handleCgiRead() → read(stdout) → write(tmp)</span>
         <span class="arr">→</span>

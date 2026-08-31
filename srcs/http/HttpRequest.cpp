@@ -2,74 +2,15 @@
 #include <sstream>
 #include <vector>
 
-static std::string decodeChunkedBody(const std::string &raw) {
-	std::string decoded;
-	size_t pos = 0;
-	while (pos < raw.length()) {
-		size_t lineEnd = raw.find("\r\n", pos);
-		if (lineEnd == std::string::npos)
-			break;
-		std::string hexSize = raw.substr(pos, lineEnd - pos);
-		size_t semiPos = hexSize.find(';');
-		if (semiPos != std::string::npos)
-			hexSize = hexSize.substr(0, semiPos);
-		std::istringstream hexStream(hexSize);
-		unsigned long chunkSize;
-		if (!(hexStream >> std::hex >> chunkSize) || !hexStream.eof())
-			break;
-		if (chunkSize == 0)
-			break;
-		pos = lineEnd + 2;
-		if (pos + chunkSize > raw.length())
-			break;
-		decoded.append(raw, pos, chunkSize);
-		pos += chunkSize;
-		if (pos + 2 <= raw.length())
-			pos += 2;
-	}
-	return (decoded);
-}
-
 HttpRequest::HttpRequest(const std::string &rawData) {
 	method = "";
 	uri = "";
 	version = "";
-	body = "";
 	valid = false;
 	size_t headerEnd = rawData.find("\r\n\r\n");
 	std::string headerPart;
 	if (headerEnd != std::string::npos) {
 		headerPart = rawData.substr(0, headerEnd);
-		std::string rawBody = rawData.substr(headerEnd + 4);
-		bool isChunked = (headerPart.find("Transfer-Encoding: chunked") != std::string::npos) || (headerPart.find("transfer-encoding: chunked") != std::string::npos);
-		if (isChunked)
-			body = decodeChunkedBody(rawBody);
-		else {
-			size_t contentLength = 0;
-			size_t clPos = headerPart.find("Content-Length: ");
-			if (clPos == std::string::npos)
-				clPos = headerPart.find("Content-length: ");
-			if (clPos == std::string::npos)
-				clPos = headerPart.find("content-length: ");
-			if (clPos != std::string::npos) {
-				size_t valueStart = clPos + 16;
-				size_t valueEnd = headerPart.find("\r\n", valueStart);
-				if (valueEnd != std::string::npos) {
-					std::string clStr = headerPart.substr(valueStart, valueEnd - valueStart);
-					size_t trimStart = clStr.find_first_not_of(" \t");
-					size_t trimEnd = clStr.find_last_not_of(" \t");
-					if (trimStart != std::string::npos)
-						clStr = clStr.substr(trimStart, trimEnd - trimStart + 1);
-					std::istringstream clStream(clStr);
-					if (!(clStream >> contentLength))
-						contentLength = 0;
-				}
-			}
-			if (contentLength > 0 && contentLength <= rawBody.length())
-				body = rawBody.substr(0, contentLength);
-			else
-				body = rawBody;
-		}
 	}
 	else
 		headerPart = rawData;
@@ -178,10 +119,6 @@ const std::string &HttpRequest::getVersion() const {
 
 const std::map<std::string, std::string> &HttpRequest::getHeaders() const {
 	return (headers);
-}
-
-const std::string &HttpRequest::getBody() const {
-	return (body);
 }
 
 bool HttpRequest::isValid() const {

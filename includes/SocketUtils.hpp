@@ -5,6 +5,8 @@
 # include <netinet/in.h>
 # include <fcntl.h>
 # include <unistd.h>
+# include <sys/time.h>
+# include <ctime>
 
 class SocketUtils {
 private:
@@ -16,6 +18,7 @@ private:
 public:
 	static int createListeningSocket(int port);
 	static void setNonBlocking(int fd);
+	static time_t getCurrentTime();
 };
 
 #endif
