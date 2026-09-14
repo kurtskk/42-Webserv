@@ -1,4 +1,4 @@
-*Este projeto foi criado como parte do currículo da 42 por jose-cad.*
+*Este projeto foi criado como parte do currículo da 42 por jose-cad, kgagliar, bolegari.*
 
 ---
 # Webserv - Servidor HTTP em C++98
